@@ -9,9 +9,13 @@ A minimal Sign-In With X demo server. Supports Phantom (Solana) and MetaMask (Et
 go run ./examples/hub
 ```
 
-Defaults: `SIWX_DOMAIN=localhost:8081`, `SIWX_ADDR=:8081`.
+Defaults: domain `localhost:8081` (from `SIWX_DOMAIN=localhost` + `SIWX_PORT=8081`).
 
 Open http://localhost:8081 in a browser.
+
+To change any setting, copy [`.env.example`](../../.env.example) to `.env` in the
+repo root and edit it — the hub loads `.env` at startup. Real environment
+variables always override `.env` values.
 
 ## Manual wallet test
 
@@ -43,6 +47,7 @@ nonce. The request is rejected with a 401 nonce-check-failed problem-detail
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | /auth/nonce | Issue a single-use nonce (10 min TTL) |
+| GET | /config | Demo display config the frontend uses to build the sign-in message |
 | POST | /auth/verify | Verify wallet signature → JWT |
 | POST | /auth/link | Link additional wallet to existing session |
 | GET | /.well-known/jwks.json | RS256 public key for spoke validation |
@@ -52,11 +57,26 @@ nonce. The request is rejected with a 401 nonce-check-failed problem-detail
 
 ## Configuration
 
+All settings are environment-driven (single source of truth). Set them as real
+environment variables or via a `.env` file in the repo root — see
+[`.env.example`](../../.env.example) for the full annotated list. Real
+environment variables override `.env`.
+
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `SIWX_DOMAIN` | `localhost:8081` | Expected domain in sign-in messages |
-| `SIWX_ADDR` | `:8081` | Listen address |
-| `SIWX_JWKS_URL` | `http://localhost:8081/.well-known/jwks.json` | JWKS URL for JWT middleware |
+| `SIWX_DOMAIN` | `localhost` | Hostname (no port) used in the sign-in domain |
+| `SIWX_PORT` | `8081` | Port; combined with `SIWX_DOMAIN` into the authority |
+| `SIWX_ADDR` | `:<SIWX_PORT>` | Listen address |
+| `SIWX_JWKS_URL` | `http://localhost:<port>/.well-known/jwks.json` | JWKS URL for JWT middleware |
+| `SIWX_ISSUER_URL` | `https://accounts.example.local` | JWT `iss` claim |
+| `SIWX_AUDIENCE` | `siwx-go-demo` | JWT `aud` claim |
+| `SIWX_STATEMENT` | `Sign in to siwx-go demo` | Statement shown in the wallet prompt |
+| `SIWX_SOLANA_CHAIN` | `mainnet` | Solana cluster in the SIWS `Chain ID` field |
+| `SIWX_SESSION_TTL_MIN` | `10` | Sign-in message validity window, in minutes |
+
+The frontend reads `SIWX_STATEMENT`, `SIWX_SOLANA_CHAIN`, and
+`SIWX_SESSION_TTL_MIN` from `GET /config` rather than hard-coding them, so a
+change to `.env` takes effect on the next page load with no code edits.
 
 ## Production note
 

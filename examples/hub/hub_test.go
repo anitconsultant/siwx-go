@@ -31,7 +31,7 @@ const testDomain = "dapp.academy"
 func buildTestHub(t *testing.T) (*Hub, *httptest.Server) {
 	t.Helper()
 
-	issuer, err := newIssuer()
+	issuer, err := newIssuer("https://accounts.example.local", "siwx-go-demo")
 	if err != nil {
 		t.Fatalf("newIssuer: %v", err)
 	}
@@ -42,12 +42,15 @@ func buildTestHub(t *testing.T) (*Hub, *httptest.Server) {
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 
 	hub := &Hub{
-		domain:   testDomain,
-		registry: registry,
-		nonces:   newNonceStore(time.Now),
-		ids:      newIdentityStore(),
-		issuer:   issuer,
-		recorder: newRecorder(log),
+		domain:        testDomain,
+		registry:      registry,
+		nonces:        newNonceStore(time.Now),
+		ids:           newIdentityStore(),
+		issuer:        issuer,
+		recorder:      newRecorder(log),
+		statement:     "Sign in to siwx-go demo",
+		solanaChain:   "mainnet",
+		sessionTTLMin: 10,
 	}
 	return hub, nil
 }

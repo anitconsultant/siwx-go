@@ -35,6 +35,11 @@ type Hub struct {
 	ids      *memIdentityStore
 	issuer   *mockIssuer
 	recorder *Recorder
+
+	// Demo display config surfaced to the frontend via GET /config.
+	statement     string // sign-in prompt statement
+	solanaChain   string // Solana cluster, e.g. "mainnet"
+	sessionTTLMin int    // sign-in message expiration window, in minutes
 }
 
 func requestID(c *gin.Context) string {
@@ -54,6 +59,17 @@ func (h *Hub) getNonce(c *gin.Context) {
 	}
 	h.recorder.counters.incNonceIssued()
 	c.JSON(http.StatusOK, gin.H{"nonce": nonce, "domain": h.domain})
+}
+
+// getConfig handles GET /config — demo display config the frontend uses to
+// build the sign-in message. Single source of truth: these come from the
+// hub's environment-driven Config, never hard-coded in the browser.
+func (h *Hub) getConfig(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"statement":         h.statement,
+		"solanaChain":       h.solanaChain,
+		"sessionTtlMinutes": h.sessionTTLMin,
+	})
 }
 
 // postVerify handles POST /auth/verify

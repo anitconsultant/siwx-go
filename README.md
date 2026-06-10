@@ -91,7 +91,10 @@ go run ./examples/hub
 # Open http://localhost:8081 in a browser with Phantom or MetaMask installed.
 ```
 
-See [`examples/web/README.md`](examples/web/README.md) for the full manual wallet test walkthrough.
+Configuration is environment-driven: copy [`.env.example`](.env.example) to
+`.env` and edit it (the hub loads `.env` at startup), or set the `SIWX_*`
+variables directly. See [`examples/web/README.md`](examples/web/README.md) for
+the full config table and the manual wallet test walkthrough.
 
 ---
 

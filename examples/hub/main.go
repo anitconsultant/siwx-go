@@ -18,11 +18,9 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	slog.SetDefault(log)
 
-	domain := buildDomain(env("SIWX_DOMAIN", "localhost"), env("SIWX_PORT", "8081"))
-	addr := env("SIWX_ADDR", ":"+env("SIWX_PORT", "8081"))
-	jwksURL := env("SIWX_JWKS_URL", "http://localhost:8081/.well-known/jwks.json")
+	cfg := loadConfig()
 
-	issuer, err := newIssuer()
+	issuer, err := newIssuer(cfg.IssuerURL, cfg.Audience)
 	if err != nil {
 		log.Error("failed to generate issuer key", "err", err)
 		os.Exit(1)
@@ -35,12 +33,15 @@ func main() {
 	recorder := newRecorder(log)
 
 	hub := &Hub{
-		domain:   domain,
-		registry: registry,
-		nonces:   newNonceStore(time.Now),
-		ids:      newIdentityStore(),
-		issuer:   issuer,
-		recorder: recorder,
+		domain:        cfg.Domain,
+		registry:      registry,
+		nonces:        newNonceStore(time.Now),
+		ids:           newIdentityStore(),
+		issuer:        issuer,
+		recorder:      recorder,
+		statement:     cfg.Statement,
+		solanaChain:   cfg.SolanaChain,
+		sessionTTLMin: cfg.SessionTTLMin,
 	}
 
 	r := gin.New()
@@ -49,7 +50,10 @@ func main() {
 	// Auth endpoints.
 	r.GET("/auth/nonce", hub.getNonce)
 	r.POST("/auth/verify", hub.postVerify)
-	r.POST("/auth/link", hubmw.JWTAuth(jwksURL, issuerURL, defaultAud), hub.postLink)
+	r.POST("/auth/link", hubmw.JWTAuth(cfg.JWKSURL, cfg.IssuerURL, cfg.Audience), hub.postLink)
+
+	// Demo display config for the frontend.
+	r.GET("/config", hub.getConfig)
 
 	// Well-known + observability.
 	r.GET("/.well-known/jwks.json", hub.getJWKS)
@@ -57,7 +61,7 @@ func main() {
 	r.GET("/healthz", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
 
 	// Demo protected endpoint.
-	r.GET("/me", hubmw.JWTAuth(jwksURL, issuerURL, defaultAud), hubmw.GetMe)
+	r.GET("/me", hubmw.JWTAuth(cfg.JWKSURL, cfg.IssuerURL, cfg.Audience), hubmw.GetMe)
 
 	// Static web files served explicitly to avoid Gin v1.9.1 wildcard conflicts.
 	webDir := "./examples/web"
@@ -65,8 +69,8 @@ func main() {
 	r.GET("/app.js", func(c *gin.Context) { c.File(webDir + "/app.js") })
 	r.GET("/siwx-progress.js", func(c *gin.Context) { c.File(webDir + "/siwx-progress.js") })
 
-	log.Info("siwx-go hub starting", "addr", addr, "domain", domain)
-	if err := r.Run(addr); err != nil {
+	log.Info("siwx-go hub starting", "addr", cfg.Addr, "domain", cfg.Domain)
+	if err := r.Run(cfg.Addr); err != nil {
 		log.Error("server error", "err", err)
 		os.Exit(1)
 	}

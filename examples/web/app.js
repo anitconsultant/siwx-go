@@ -141,6 +141,17 @@ async function fetchNonce() {
   return { nonce, domain };
 }
 
+// Demo config (statement, Solana chain, session window) is server-owned and
+// fetched once, never hard-coded here. Cached after first load.
+let _config = null;
+async function fetchConfig() {
+  if (_config) return _config;
+  const r = await fetch(`${HUB}/config`);
+  if (!r.ok) throw new Error('Config fetch failed: ' + r.status);
+  _config = await r.json();
+  return _config;
+}
+
 async function postVerify(message, signature, chainId) {
   const r = await fetch(`${HUB}/auth/verify`, {
     method: 'POST',
@@ -166,7 +177,7 @@ async function solanaSignIn() {
   try {
     steps = setStep(steps, 'nonce', 'active');
     prog.steps = steps;
-    const { nonce, domain } = await fetchNonce();
+    const [{ nonce, domain }, config] = await Promise.all([fetchNonce(), fetchConfig()]);
     steps = setStep(steps, 'nonce', 'done');
 
     steps = setStep(steps, 'wallet', 'active');
@@ -180,12 +191,12 @@ async function solanaSignIn() {
     const result = await phantom.signIn({
       domain,
       nonce,
-      statement: 'Sign in to siwx-go demo',
+      statement: config.statement,
       uri: window.location.origin + '/',
       version: '1',
-      chainId: 'mainnet',
+      chainId: config.solanaChain,
       issuedAt: new Date().toISOString(),
-      expirationTime: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      expirationTime: new Date(Date.now() + config.sessionTtlMinutes * 60 * 1000).toISOString(),
     });
 
     // Phantom returns: result.signedMessage (Uint8Array), result.signature (Uint8Array)
@@ -195,7 +206,7 @@ async function solanaSignIn() {
 
     steps = setStep(steps, 'verify', 'active');
     prog.steps = steps;
-    const resp = await postVerify(message, signature, 'solana:mainnet');
+    const resp = await postVerify(message, signature, `solana:${config.solanaChain}`);
 
     // Animate checks with stagger.
     const checks = resp.checks || [];
@@ -261,7 +272,7 @@ async function evmSignIn() {
   try {
     steps = setStep(steps, 'nonce', 'active');
     prog.steps = steps;
-    const { nonce, domain } = await fetchNonce();
+    const [{ nonce, domain }, config] = await Promise.all([fetchNonce(), fetchConfig()]);
     steps = setStep(steps, 'nonce', 'done');
 
     steps = setStep(steps, 'wallet', 'active');
@@ -274,14 +285,14 @@ async function evmSignIn() {
     const chainIdHex = await provider.request({ method: 'eth_chainId' });
     const chainIdDec = parseInt(chainIdHex, 16);
     const issuedAt = new Date().toISOString();
-    const expirationTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const expirationTime = new Date(Date.now() + config.sessionTtlMinutes * 60 * 1000).toISOString();
     const uri = window.location.origin + '/';
 
     const siweMsg = [
       `${domain} wants you to sign in with your Ethereum account:`,
       address,
       '',
-      'Sign in to siwx-go demo',
+      config.statement,
       '',
       `URI: ${uri}`,
       'Version: 1',

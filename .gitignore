@@ -4,6 +4,9 @@
 *.test
 *.out
 
+# Local environment config (committed: .env.example only)
+.env
+
 # Go workspace
 go.work
 go.work.sum

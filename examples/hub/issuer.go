@@ -16,15 +16,16 @@ import (
 )
 
 const (
-	mockKid    = "mock-1"
-	tokenTTL   = time.Hour
-	issuerURL  = "https://accounts.example.local"
-	defaultAud = "siwx-go-demo"
+	mockKid  = "mock-1"
+	tokenTTL = time.Hour
 )
 
 // mockIssuer generates an RSA-2048 key at construction and mints RS256 JWTs.
+// issuerURL and audience are injected from config (single source of truth).
 type mockIssuer struct {
-	key *rsa.PrivateKey
+	key       *rsa.PrivateKey
+	issuerURL string
+	audience  string
 }
 
 // hubClaims extends the standard JWT claims with the wallets list.
@@ -33,12 +34,12 @@ type hubClaims struct {
 	Wallets []string `json:"wallets"`
 }
 
-func newIssuer() (*mockIssuer, error) {
+func newIssuer(issuerURL, audience string) (*mockIssuer, error) {
 	k, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, err
 	}
-	return &mockIssuer{key: k}, nil
+	return &mockIssuer{key: k, issuerURL: issuerURL, audience: audience}, nil
 }
 
 func (m *mockIssuer) Issue(_ context.Context, identityID string, wallets []siwx.CAIP10) (string, error) {
@@ -53,8 +54,8 @@ func (m *mockIssuer) Issue(_ context.Context, identityID string, wallets []siwx.
 	claims := hubClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   sub,
-			Issuer:    issuerURL,
-			Audience:  jwt.ClaimStrings{defaultAud},
+			Issuer:    m.issuerURL,
+			Audience:  jwt.ClaimStrings{m.audience},
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(tokenTTL)),
 		},

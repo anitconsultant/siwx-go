@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 	"github.com/anitconsultant/siwx-go/siwx"
+	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 )
 
 // ---- vector loader (mirrors siws package; WT-D will unify) ----
@@ -22,11 +22,11 @@ type tvKey struct {
 }
 
 type tvEntry struct {
-	Name           string `json:"name"`
-	Key            string `json:"key"`
-	MessageBase64  string `json:"messageBase64"`
+	Name            string `json:"name"`
+	Key             string `json:"key"`
+	MessageBase64   string `json:"messageBase64"`
 	SignatureBase64 string `json:"signatureBase64"`
-	ExpectedError  string `json:"expectedError"`
+	ExpectedError   string `json:"expectedError"`
 }
 
 type tvFile struct {
@@ -80,12 +80,16 @@ type recordingObserver struct {
 	events []string
 }
 
-func (r *recordingObserver) OnVerifyAttempt(e siwx.VerifyAttempt) { r.events = append(r.events, "attempt") }
-func (r *recordingObserver) OnParseResult(e siwx.ParseResult)     { r.events = append(r.events, "parse") }
-func (r *recordingObserver) OnCheckResult(e siwx.CheckResult)     {
+func (r *recordingObserver) OnVerifyAttempt(e siwx.VerifyAttempt) {
+	r.events = append(r.events, "attempt")
+}
+func (r *recordingObserver) OnParseResult(e siwx.ParseResult) { r.events = append(r.events, "parse") }
+func (r *recordingObserver) OnCheckResult(e siwx.CheckResult) {
 	r.events = append(r.events, "check:"+string(e.Check))
 }
-func (r *recordingObserver) OnVerifyResult(e siwx.VerifyResult) { r.events = append(r.events, "result") }
+func (r *recordingObserver) OnVerifyResult(e siwx.VerifyResult) {
+	r.events = append(r.events, "result")
+}
 
 // ---- tests ----
 

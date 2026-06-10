@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/anitconsultant/siwx-go/siwx"
+	"github.com/gin-gonic/gin"
 )
 
 // verifyRequest is the POST /auth/verify body.

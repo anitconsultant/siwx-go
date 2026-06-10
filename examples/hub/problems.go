@@ -4,8 +4,8 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/anitconsultant/siwx-go/siwx"
+	"github.com/gin-gonic/gin"
 )
 
 // problem is an RFC 7807 problem-details response.

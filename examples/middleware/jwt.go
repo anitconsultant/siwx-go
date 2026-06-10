@@ -28,12 +28,14 @@ type HubClaims struct {
 
 // jwksCache caches public keys fetched from a JWKS endpoint.
 type jwksCache struct {
-	mu      sync.RWMutex
-	url     string
-	keys    map[string]*rsa.PublicKey // kid → key
+	mu   sync.RWMutex
+	url  string
+	keys map[string]*rsa.PublicKey // kid → key
 }
 
-func newJWKSCache(url string) *jwksCache { return &jwksCache{url: url, keys: make(map[string]*rsa.PublicKey)} }
+func newJWKSCache(url string) *jwksCache {
+	return &jwksCache{url: url, keys: make(map[string]*rsa.PublicKey)}
+}
 
 func (c *jwksCache) get(kid string) (*rsa.PublicKey, error) {
 	c.mu.RLock()

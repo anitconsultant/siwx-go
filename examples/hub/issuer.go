@@ -11,8 +11,8 @@ import (
 	"math/big"
 	"time"
 
-	jwt "github.com/golang-jwt/jwt/v5"
 	"github.com/anitconsultant/siwx-go/siwx"
+	jwt "github.com/golang-jwt/jwt/v5"
 )
 
 const (

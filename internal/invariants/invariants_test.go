@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 	"github.com/anitconsultant/siwx-go/internal/testvectors"
 	"github.com/anitconsultant/siwx-go/siws"
 	"github.com/anitconsultant/siwx-go/siwx"
+	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 )
 
 func loadCorpus(t *testing.T) *testvectors.Corpus {
@@ -111,7 +111,7 @@ func TestInvariantWrongKeyNeverVerifies(t *testing.T) {
 	c := loadCorpus(t)
 	// basic_with_expiry is signed by key0; no_statement_no_expiry is signed by key1.
 	// Use key1's sig against basic_with_expiry's message (which claims key0's address).
-	validForKey0 := c.Valid[0]   // message carries key0 address
+	validForKey0 := c.Valid[0]           // message carries key0 address
 	signedByKey1 := c.Valid[1].Signature // signature made by key1
 
 	opts := validSiwsOpts(c, validForKey0, c.ReferenceTime)
@@ -140,7 +140,7 @@ func TestInvariantFutureNotBeforeNeverVerifies(t *testing.T) {
 
 // captureObserver records all observer events.
 type captureObserver struct {
-	order   []string
+	order    []string
 	attempts []siwx.VerifyAttempt
 	parses   []siwx.ParseResult
 	checks   []siwx.CheckResult

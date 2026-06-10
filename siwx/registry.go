@@ -12,7 +12,7 @@ import (
 
 // registry is the default VerifierRegistry implementation.
 type registry struct {
-	mu       sync.RWMutex
+	mu        sync.RWMutex
 	verifiers map[string]Verifier // namespace -> Verifier
 }
 

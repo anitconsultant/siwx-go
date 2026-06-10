@@ -24,7 +24,7 @@ type tvEntry struct {
 	Key             string `json:"key"`
 	Message         string `json:"message"`
 	MessageBase64   string `json:"messageBase64"`
-	SignatureBase64  string `json:"signatureBase64"`
+	SignatureBase64 string `json:"signatureBase64"`
 	ExpectedError   string `json:"expectedError"`
 	Note            string `json:"note"`
 }

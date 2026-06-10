@@ -27,10 +27,10 @@ type counters struct {
 	tokensIssued  atomic.Int64
 }
 
-func (c *counters) incAttempts()        { c.attemptsTotal.Add(1) }
-func (c *counters) incNonceIssued()     { c.noncesIssued.Add(1) }
-func (c *counters) incNonceBurned()     { c.nonceBurned.Add(1) }
-func (c *counters) incTokensIssued()    { c.tokensIssued.Add(1) }
+func (c *counters) incAttempts()     { c.attemptsTotal.Add(1) }
+func (c *counters) incNonceIssued()  { c.noncesIssued.Add(1) }
+func (c *counters) incNonceBurned()  { c.nonceBurned.Add(1) }
+func (c *counters) incTokensIssued() { c.tokensIssued.Add(1) }
 
 func (c *counters) incFailure(reason string) {
 	v, _ := c.failuresTotal.LoadOrStore(reason, &atomic.Int64{})

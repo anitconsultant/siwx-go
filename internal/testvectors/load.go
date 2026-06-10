@@ -37,11 +37,11 @@ func (k Key) Sign(msg []byte) []byte {
 
 // Vector is a single test case from vectors.json.
 type Vector struct {
-	Name           string
-	Key            string
-	Message        []byte // decoded from messageBase64
-	Signature      []byte // decoded from signatureBase64
-	ExpectedError  error  // nil for valid vectors; one of the siwx/siws sentinels
+	Name          string
+	Key           string
+	Message       []byte // decoded from messageBase64
+	Signature     []byte // decoded from signatureBase64
+	ExpectedError error  // nil for valid vectors; one of the siwx/siws sentinels
 }
 
 // Corpus holds the loaded test data.
@@ -120,11 +120,11 @@ type rawKey struct {
 }
 
 type rawEntry struct {
-	Name           string `json:"name"`
-	Key            string `json:"key"`
-	MessageB64     string `json:"messageBase64"`
-	SignatureB64   string `json:"signatureBase64"`
-	ExpectedError  string `json:"expectedError"`
+	Name          string `json:"name"`
+	Key           string `json:"key"`
+	MessageB64    string `json:"messageBase64"`
+	SignatureB64  string `json:"signatureBase64"`
+	ExpectedError string `json:"expectedError"`
 }
 
 // sentinelMap maps expectedError strings → siws sentinels (for siws.VerifyRaw tests).

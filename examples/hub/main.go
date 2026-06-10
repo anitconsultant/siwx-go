@@ -6,11 +6,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/anitconsultant/siwx-go/siwx"
-	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
-	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
 	hubmw "github.com/anitconsultant/siwx-go/examples/middleware"
+	"github.com/anitconsultant/siwx-go/siwx"
+	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
+	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {

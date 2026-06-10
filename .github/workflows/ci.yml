@@ -25,6 +25,9 @@ jobs:
         if: runner.os == 'Linux'
         run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
       - run: go test -race -coverprofile=cover.out ./...
+        if: runner.os != 'Windows'
+      - run: go test -race ./...
+        if: runner.os == 'Windows'
       - name: coverage gates
         if: runner.os == 'Linux'
         run: |

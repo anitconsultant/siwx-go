@@ -37,3 +37,24 @@ func TestParseMessageRejectsOversizedInput(t *testing.T) {
 		t.Fatalf("want ErrMalformed for oversized message, got %v", err)
 	}
 }
+
+// TestParseMessageRejectsOutOfOrderOptionalFields guards the L2 strictness fix:
+// optional trailer fields must appear in SIWS ABNF order.
+func TestParseMessageRejectsOutOfOrderOptionalFields(t *testing.T) {
+	const addr = "DFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA"
+	base := "dapp.academy wants you to sign in with your Solana account:\n" + addr +
+		"\n\nURI: https://dapp.academy\nVersion: 1\nChain ID: mainnet\n" +
+		"Nonce: 32891756dCb1\nIssued At: 2026-06-09T11:59:00.000Z\n"
+
+	// In-order (Expiration Time then Not Before) must parse.
+	inOrder := base + "Expiration Time: 2026-06-09T12:09:00.000Z\nNot Before: 2026-06-09T11:00:00.000Z"
+	if _, err := siws.ParseMessage([]byte(inOrder)); err != nil {
+		t.Fatalf("in-order optional fields should parse, got %v", err)
+	}
+
+	// Reversed (Not Before before Expiration Time) must be rejected.
+	reversed := base + "Not Before: 2026-06-09T11:00:00.000Z\nExpiration Time: 2026-06-09T12:09:00.000Z"
+	if _, err := siws.ParseMessage([]byte(reversed)); !errors.Is(err, siws.ErrMalformed) {
+		t.Fatalf("want ErrMalformed for out-of-order fields, got %v", err)
+	}
+}

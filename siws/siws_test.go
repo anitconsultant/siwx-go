@@ -1,5 +1,9 @@
 package siws_test
 
+// These tests intentionally exercise the deprecated Message.Verify re-serialization
+// path, so suppress staticcheck's deprecation warning for this file.
+//lint:file-ignore SA1019 deliberately testing the deprecated Message.Verify
+
 import (
 	"encoding/base64"
 	"encoding/json"

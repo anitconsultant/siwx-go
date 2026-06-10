@@ -5,6 +5,9 @@ package invariants_test
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"runtime"
@@ -17,6 +20,16 @@ import (
 	"github.com/anitconsultant/siwx-go/siwx"
 	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 )
+
+// mustJSON serializes an observer event so tests can scan every field at once.
+func mustJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal event: %v", err)
+	}
+	return string(b)
+}
 
 func loadCorpus(t *testing.T) *testvectors.Corpus {
 	t.Helper()
@@ -233,16 +246,28 @@ func TestInvariantObserverNoSensitiveData(t *testing.T) {
 		}
 	}
 
-	// No VerifyResult field should contain the raw signature as a string.
-	sigStr := string(v.Signature)
-	for _, vr := range obs.results {
-		if bytes.Contains([]byte(vr.Namespace), v.Signature) {
-			t.Error("VerifyResult.Namespace contains raw signature bytes")
+	// Serialize every captured event and assert the raw signature never appears
+	// in any field, in either base64 or hex encoding. This catches a leak in any
+	// current or future event field, not just the ones we name by hand.
+	sigB64 := base64.StdEncoding.EncodeToString(v.Signature)
+	sigHex := hex.EncodeToString(v.Signature)
+	var events []string
+	for _, e := range obs.attempts {
+		events = append(events, mustJSON(t, e))
+	}
+	for _, e := range obs.parses {
+		events = append(events, mustJSON(t, e))
+	}
+	for _, e := range obs.checks {
+		events = append(events, mustJSON(t, e))
+	}
+	for _, e := range obs.results {
+		events = append(events, mustJSON(t, e))
+	}
+	for _, e := range events {
+		if strings.Contains(e, sigB64) || strings.Contains(e, sigHex) {
+			t.Errorf("observer event leaks raw signature: %s", e)
 		}
-		if bytes.Contains([]byte(vr.AttemptID), v.Signature) {
-			t.Error("VerifyResult.AttemptID contains raw signature bytes")
-		}
-		_ = sigStr // used above implicitly via v.Signature
 	}
 
 	// Verify no attempt event leaks message text.
@@ -310,9 +335,11 @@ func TestInvariantS4ErrorTextNeverEchoesInput(t *testing.T) {
 	for _, tc := range cases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			// The all-zero signature guarantees a failure path, so an error is
+			// required; a nil here would mean the test passed vacuously.
 			_, err := siws.VerifyRaw([]byte(tc.msg), make([]byte, 64), tc.opts)
 			if err == nil {
-				return // passes without error — marker not reflected
+				t.Fatal("expected an error (bad signature at minimum), got nil")
 			}
 			if strings.Contains(err.Error(), marker) {
 				t.Errorf("S4 violation: error text echoes attacker marker: %v", err)

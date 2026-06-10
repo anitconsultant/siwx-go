@@ -67,12 +67,12 @@ func VerifyRaw(msg, sig []byte, opts VerifyOpts) (*Message, error) {
 
 // Verify verifies sig against the re-serialized form of m (m.String()).
 //
-// DEPRECATED: prefer VerifyRaw, which verifies the exact bytes that the wallet
+// Deprecated: prefer VerifyRaw, which verifies the exact bytes the wallet
 // signed. This method re-serializes the parsed struct via String(), so if any
 // timestamp or optional field was stored in a non-canonical format during
-// parsing, the re-serialized bytes will differ from what was signed and
-// verification will fail with ErrBadSignature even for a valid signature.
-// Use VerifyRaw(rawBytes, sig, opts) whenever the original wire bytes are available.
+// parsing, the re-serialized bytes differ from what was signed and verification
+// fails with ErrBadSignature even for a valid signature. Use VerifyRaw(rawBytes,
+// sig, opts) whenever the original wire bytes are available.
 func (m *Message) Verify(sig []byte, opts VerifyOpts) error {
 	if opts.ExpectedDomain == "" || opts.ExpectedNonce == "" {
 		return fmt.Errorf("verify: ExpectedDomain and ExpectedNonce are required: %w", ErrMalformed)
@@ -114,7 +114,10 @@ func checkExpiry(m *Message, now time.Time) error {
 	return nil
 }
 
-// checkNonce compares in constant time to resist timing attacks.
+// checkNonce compares the nonce in constant time to resist timing attacks.
+// ConstantTimeCompare short-circuits on a length mismatch, leaking only the
+// nonce length — never its contents. Nonces are fixed-format server-issued
+// tokens, so their length is not secret; this residual channel is accepted.
 func checkNonce(m *Message, expected string) error {
 	if subtle.ConstantTimeCompare([]byte(m.Nonce), []byte(expected)) != 1 {
 		return fmt.Errorf("verify: nonce mismatch: %w", ErrNonceMismatch)

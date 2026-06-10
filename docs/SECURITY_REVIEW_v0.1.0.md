@@ -206,7 +206,33 @@ of `TestInvariantWrongKeyNeverVerifies` and `TestInvariantExpiredNeverVerifies`.
 
 ## Disposition for v0.1.0
 
-No Critical/High → **the tag is not blocked.** Both Mediums are now **fixed and tested**:
+No Critical/High → **the tag is not blocked.** Both Mediums are **fixed and tested**:
 **M1** (nonce bound to the client via cookie; in-library check is load-bearing) and
-**M2** (three-layer input length bound). **I5** was fixed alongside M1. The remaining
-Low/Info items are non-blocking and can be tracked as follow-ups. **Cleared for v0.1.0.**
+**M2** (three-layer input length bound). **Cleared for v0.1.0** (released as v0.2.0).
+
+### Low/Info disposition (2026-06-10)
+
+All Low and Info items have since been addressed:
+
+- **L1** ✅ fixed — parser comment corrected to match the trailing-newline behavior.
+- **L2** ✅ fixed — optional trailer fields now enforced in strict SIWS ABNF order via a
+  stage counter (also subsumes the duplicate checks). Test:
+  `TestParseMessageRejectsOutOfOrderOptionalFields`.
+- **L3** ✅ covered — EVM expiry is proven enforced by the adapter's own frozen-clock
+  check by the existing `TestEVMAdapterExpired`; siwe-go v0.2.1 `VerifyEIP191` is
+  signature-only, so there is no competing clock today.
+- **L4** ✅ covered — EVM negative paths are already exercised by the adapter suite
+  (`TestEVMAdapterExpired`, `NotYetValid`, `BadSignature`, `MalformedMessage`,
+  `DomainMismatch`, `NonceMismatch`). The cross-package invariants harness remains
+  Solana-only by design; the EVM equivalents live in `siwx/evm/adapter_test.go`.
+- **I1** ✅ fixed — the S4 error-text test now requires an error instead of silently
+  passing on `nil` (vacuous escape removed).
+- **I2** ✅ fixed — the observer no-leak test now JSON-serializes every event and asserts
+  the raw signature never appears in any field (base64 or hex), replacing the
+  tautological field checks; dead code removed.
+- **I3** ✅ accepted/documented — the `ConstantTimeCompare` length channel leaks only the
+  nonce length, which is not secret for a fixed-format server token; rationale recorded
+  in `checkNonce`.
+- **I4** ✅ fixed — `Message.Verify` now uses the Go-standard `// Deprecated:` marker so
+  IDEs and staticcheck flag misuse; the deprecated-path tests carry a `//lint:file-ignore`.
+- **I5** ✅ fixed — `/auth/link` now uses the request context (resolved alongside M1).

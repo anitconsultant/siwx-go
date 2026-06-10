@@ -27,7 +27,8 @@ func ParseMessage(b []byte) (*Message, error) {
 		return nil, fmt.Errorf("parse: CRLF line endings not allowed: %w", ErrMalformed)
 	}
 
-	// Trim a single trailing newline if present; the serializer always adds one.
+	// Trim trailing newlines before splitting. Verification uses the original
+	// bytes (VerifyRaw), so this only affects field parsing, not what was signed.
 	b = bytes.TrimRight(b, "\n")
 
 	lines := strings.Split(string(b), "\n")
@@ -132,14 +133,19 @@ func ParseMessage(b []byte) (*Message, error) {
 		}
 	}
 
-	// Optional fields in order: Expiration Time, Not Before, Request ID, Resources.
+	// Optional trailer fields must appear in strict SIWS ABNF order, each at most
+	// once: Expiration Time (1) → Not Before (2) → Request ID (3) → Resources (4).
+	// stage tracks the highest field seen; a field whose rank is <= stage is
+	// either a duplicate or out of order, and is rejected.
+	stage := 0
 	for pos < len(lines) {
 		line := lines[pos]
 		switch {
 		case strings.HasPrefix(line, "Expiration Time: "):
-			if m.ExpirationTime != nil {
-				return nil, fmt.Errorf("parse: duplicate Expiration Time: %w", ErrMalformed)
+			if stage >= 1 {
+				return nil, fmt.Errorf("parse: Expiration Time out of order or duplicated: %w", ErrMalformed)
 			}
+			stage = 1
 			val := strings.TrimPrefix(line, "Expiration Time: ")
 			t, terr := parseTimestamp(val)
 			if terr != nil {
@@ -149,9 +155,10 @@ func ParseMessage(b []byte) (*Message, error) {
 			pos++
 
 		case strings.HasPrefix(line, "Not Before: "):
-			if m.NotBefore != nil {
-				return nil, fmt.Errorf("parse: duplicate Not Before: %w", ErrMalformed)
+			if stage >= 2 {
+				return nil, fmt.Errorf("parse: Not Before out of order or duplicated: %w", ErrMalformed)
 			}
+			stage = 2
 			val := strings.TrimPrefix(line, "Not Before: ")
 			t, terr := parseTimestamp(val)
 			if terr != nil {
@@ -161,13 +168,18 @@ func ParseMessage(b []byte) (*Message, error) {
 			pos++
 
 		case strings.HasPrefix(line, "Request ID: "):
-			if m.RequestID != "" {
-				return nil, fmt.Errorf("parse: duplicate Request ID: %w", ErrMalformed)
+			if stage >= 3 {
+				return nil, fmt.Errorf("parse: Request ID out of order or duplicated: %w", ErrMalformed)
 			}
+			stage = 3
 			m.RequestID = strings.TrimPrefix(line, "Request ID: ")
 			pos++
 
 		case line == "Resources:":
+			if stage >= 4 {
+				return nil, fmt.Errorf("parse: Resources out of order or duplicated: %w", ErrMalformed)
+			}
+			stage = 4
 			pos++
 			for pos < len(lines) {
 				rline := lines[pos]

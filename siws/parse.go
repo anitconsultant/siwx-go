@@ -163,7 +163,8 @@ func ParseMessage(b []byte) (*Message, error) {
 			for pos < len(lines) {
 				rline := lines[pos]
 				if !strings.HasPrefix(rline, "- ") {
-					return nil, fmt.Errorf("parse: invalid resource line: %w", ErrMalformed)
+					// End of resources block; outer loop handles whatever follows.
+					break
 				}
 				m.Resources = append(m.Resources, strings.TrimPrefix(rline, "- "))
 				pos++

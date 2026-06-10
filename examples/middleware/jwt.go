@@ -46,12 +46,13 @@ func (c *jwksCache) get(kid string) (*rsa.PublicKey, error) {
 }
 
 func (c *jwksCache) refresh(kid string) (*rsa.PublicKey, error) {
+	// Re-check under write lock before fetching.
 	c.mu.Lock()
-	defer c.mu.Unlock()
-	// Re-check under write lock.
 	if k, ok := c.keys[kid]; ok {
+		c.mu.Unlock()
 		return k, nil
 	}
+	c.mu.Unlock() // release before network call to avoid holding lock during I/O
 
 	resp, err := http.Get(c.url) //nolint:gosec
 	if err != nil {
@@ -74,6 +75,7 @@ func (c *jwksCache) refresh(kid string) (*rsa.PublicKey, error) {
 		return nil, err
 	}
 
+	fetched := make(map[string]*rsa.PublicKey)
 	for _, k := range doc.Keys {
 		nBytes, err := base64.RawURLEncoding.DecodeString(k.N)
 		if err != nil {
@@ -85,7 +87,13 @@ func (c *jwksCache) refresh(kid string) (*rsa.PublicKey, error) {
 		}
 		n := new(big.Int).SetBytes(nBytes)
 		e := int(new(big.Int).SetBytes(eBytes).Int64())
-		c.keys[k.Kid] = &rsa.PublicKey{N: n, E: e}
+		fetched[k.Kid] = &rsa.PublicKey{N: n, E: e}
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for kid, key := range fetched {
+		c.keys[kid] = key
 	}
 
 	if k, ok := c.keys[kid]; ok {

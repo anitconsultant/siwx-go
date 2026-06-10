@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -101,7 +102,7 @@ func (r *Recorder) OnParseResult(e siwx.ParseResult) {
 	if !e.OK {
 		level = slog.LevelWarn
 	}
-	r.log.Log(nil, level, "parse_result", //nolint:staticcheck
+	r.log.Log(context.TODO(), level, "parse_result",
 		"attemptID", e.AttemptID,
 		"ok", e.OK,
 		"msgBytes", e.MsgBytes,
@@ -137,7 +138,7 @@ func (r *Recorder) OnVerifyResult(e siwx.VerifyResult) {
 	if !e.OK {
 		level = slog.LevelWarn
 	}
-	r.log.Log(nil, level, "verify_result", //nolint:staticcheck
+	r.log.Log(context.TODO(), level, "verify_result",
 		"attemptID", e.AttemptID,
 		"ok", e.OK,
 		"namespace", e.Namespace,

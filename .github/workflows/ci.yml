@@ -28,9 +28,15 @@ jobs:
       - name: coverage gates
         if: runner.os == 'Linux'
         run: |
-          go test -coverprofile=siws.out ./siws/... && go tool cover -func=siws.out | tail -1
-          go test -coverprofile=siwx.out ./siwx/... && go tool cover -func=siwx.out | tail -1
-          # WT-D: replace the prints above with hard threshold checks (siws>=95, siwx>=90)
+          go test -coverprofile=siws.out ./siws/...
+          siws_pct=$(go tool cover -func=siws.out | tail -1 | awk '{gsub(/%/,"",$NF); print int($NF)}')
+          echo "siws coverage: ${siws_pct}%"
+          if [ "$siws_pct" -lt 95 ]; then echo "FAIL: siws coverage ${siws_pct}% < 95%"; exit 1; fi
+
+          go test -coverprofile=siwx.out ./siwx/...
+          siwx_pct=$(go tool cover -func=siwx.out | tail -1 | awk '{gsub(/%/,"",$NF); print int($NF)}')
+          echo "siwx coverage: ${siwx_pct}%"
+          if [ "$siwx_pct" -lt 90 ]; then echo "FAIL: siwx coverage ${siwx_pct}% < 90%"; exit 1; fi
   zero-dep-siws:
     runs-on: ubuntu-latest
     steps:

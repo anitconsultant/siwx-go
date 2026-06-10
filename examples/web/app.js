@@ -36,8 +36,8 @@ function initSteps() {
 async function fetchNonce() {
   const r = await fetch(`${HUB}/auth/nonce`);
   if (!r.ok) throw new Error('Nonce fetch failed: ' + r.status);
-  const { nonce } = await r.json();
-  return nonce;
+  const { nonce, domain } = await r.json();
+  return { nonce, domain };
 }
 
 async function postVerify(message, signature, chainId) {
@@ -65,7 +65,7 @@ async function solanaSignIn() {
   try {
     steps = setStep(steps, 'nonce', 'active');
     prog.steps = steps;
-    const nonce = await fetchNonce();
+    const { nonce, domain } = await fetchNonce();
     steps = setStep(steps, 'nonce', 'done');
 
     steps = setStep(steps, 'wallet', 'active');
@@ -74,8 +74,6 @@ async function solanaSignIn() {
     if (!window.phantom?.solana?.isPhantom) throw new Error('Phantom wallet not installed');
     const phantom = window.phantom.solana;
     await phantom.connect();
-
-    const domain = window.location.hostname;
     const result = await phantom.signIn({
       domain,
       nonce,
@@ -124,7 +122,7 @@ async function evmSignIn() {
   try {
     steps = setStep(steps, 'nonce', 'active');
     prog.steps = steps;
-    const nonce = await fetchNonce();
+    const { nonce, domain } = await fetchNonce();
     steps = setStep(steps, 'nonce', 'done');
 
     steps = setStep(steps, 'wallet', 'active');
@@ -134,8 +132,6 @@ async function evmSignIn() {
     const [address] = await window.ethereum.request({ method: 'eth_requestAccounts' });
     const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
     const chainIdDec = parseInt(chainIdHex, 16);
-
-    const domain = window.location.hostname;
     const issuedAt = new Date().toISOString();
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     const uri = window.location.origin + '/';

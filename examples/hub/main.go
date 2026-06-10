@@ -17,7 +17,7 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	slog.SetDefault(log)
 
-	domain := env("SIWX_DOMAIN", "localhost")
+	domain := env("SIWX_DOMAIN", "localhost:8080")
 	addr := env("SIWX_ADDR", ":8080")
 	jwksURL := env("SIWX_JWKS_URL", "http://localhost:8080/.well-known/jwks.json")
 

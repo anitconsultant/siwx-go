@@ -53,7 +53,7 @@ func (h *Hub) getNonce(c *gin.Context) {
 		return
 	}
 	h.recorder.counters.incNonceIssued()
-	c.JSON(http.StatusOK, gin.H{"nonce": nonce})
+	c.JSON(http.StatusOK, gin.H{"nonce": nonce, "domain": h.domain})
 }
 
 // postVerify handles POST /auth/verify

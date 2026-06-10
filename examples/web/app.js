@@ -175,10 +175,17 @@ async function solanaSignIn() {
     if (!window.phantom?.solana?.isPhantom) throw new Error('Phantom wallet not installed');
     const phantom = window.phantom.solana;
     await phantom.connect();
+    // Phantom only emits the SIWS fields we pass. The siws parser requires
+    // Version and Issued At (per the SIWS ABNF), so supply a complete input.
     const result = await phantom.signIn({
       domain,
       nonce,
       statement: 'Sign in to siwx-go demo',
+      uri: window.location.origin + '/',
+      version: '1',
+      chainId: 'mainnet',
+      issuedAt: new Date().toISOString(),
+      expirationTime: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
     });
 
     // Phantom returns: result.signedMessage (Uint8Array), result.signature (Uint8Array)
@@ -215,6 +222,37 @@ async function solanaSignIn() {
 
 // ---- EVM / MetaMask ----
 
+// EIP-6963 provider discovery. With multiple wallets installed (e.g. Phantom
+// also injects an EVM provider), window.ethereum is non-deterministic, so we
+// enumerate announced providers and pick MetaMask explicitly.
+const eip6963Providers = new Map(); // rdns -> { info, provider }
+window.addEventListener('eip6963:announceProvider', (event) => {
+  const { info, provider } = event.detail;
+  eip6963Providers.set(info.rdns, { info, provider });
+});
+window.dispatchEvent(new Event('eip6963:requestProvider'));
+
+// getMetaMaskProvider returns the MetaMask EIP-1193 provider, preferring
+// EIP-6963 discovery and falling back to the legacy window.ethereum shapes.
+function getMetaMaskProvider() {
+  // 1. EIP-6963: pick MetaMask by its canonical rdns.
+  const announced = eip6963Providers.get('io.metamask');
+  if (announced) return announced.provider;
+
+  // 2. Legacy multi-provider array (older convention).
+  if (Array.isArray(window.ethereum?.providers)) {
+    const mm = window.ethereum.providers.find((p) => p.isMetaMask && !p.isPhantom);
+    if (mm) return mm;
+  }
+
+  // 3. Single injected provider — only accept it if it is actually MetaMask.
+  if (window.ethereum?.isMetaMask && !window.ethereum.isPhantom) {
+    return window.ethereum;
+  }
+
+  return null;
+}
+
 async function evmSignIn() {
   const prog = document.getElementById('progress');
   let steps = initSteps();
@@ -229,10 +267,11 @@ async function evmSignIn() {
     steps = setStep(steps, 'wallet', 'active');
     prog.steps = steps;
 
-    if (!window.ethereum) throw new Error('MetaMask not installed');
-    const [rawAddress] = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    const provider = getMetaMaskProvider();
+    if (!provider) throw new Error('MetaMask not found. Is it installed and enabled?');
+    const [rawAddress] = await provider.request({ method: 'eth_requestAccounts' });
     const address = toChecksumAddress(rawAddress);
-    const chainIdHex = await window.ethereum.request({ method: 'eth_chainId' });
+    const chainIdHex = await provider.request({ method: 'eth_chainId' });
     const chainIdDec = parseInt(chainIdHex, 16);
     const issuedAt = new Date().toISOString();
     const expirationTime = new Date(Date.now() + 10 * 60 * 1000).toISOString();
@@ -254,7 +293,7 @@ async function evmSignIn() {
 
     const msgBytes = new TextEncoder().encode(siweMsg);
     const hexMsg = '0x' + Array.from(msgBytes).map(b => b.toString(16).padStart(2, '0')).join('');
-    const hexSig = await window.ethereum.request({ method: 'personal_sign', params: [hexMsg, address] });
+    const hexSig = await provider.request({ method: 'personal_sign', params: [hexMsg, address] });
 
     // Convert hex sig to bytes.
     const sigBytes = new Uint8Array(hexSig.slice(2).match(/.{2}/g).map(b => parseInt(b, 16)));

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	hubmw "github.com/anitconsultant/siwx-go/examples/middleware"
@@ -17,8 +18,8 @@ func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	slog.SetDefault(log)
 
-	domain := env("SIWX_DOMAIN", "localhost:8081")
-	addr := env("SIWX_ADDR", ":8081")
+	domain := buildDomain(env("SIWX_DOMAIN", "localhost"), env("SIWX_PORT", "8081"))
+	addr := env("SIWX_ADDR", ":"+env("SIWX_PORT", "8081"))
 	jwksURL := env("SIWX_JWKS_URL", "http://localhost:8081/.well-known/jwks.json")
 
 	issuer, err := newIssuer()
@@ -76,4 +77,13 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// buildDomain combines host and port into an RFC 3986 authority.
+// If host already contains a colon (has port or is IPv6), it is returned as-is.
+func buildDomain(host, port string) string {
+	if strings.Contains(host, ":") || port == "" {
+		return host
+	}
+	return host + ":" + port
 }

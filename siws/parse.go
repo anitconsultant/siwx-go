@@ -94,9 +94,10 @@ func ParseMessage(b []byte) (*Message, error) {
 		return nil, fmt.Errorf("parse: unsupported version: %w", ErrMalformed)
 	}
 
-	m.ChainID, parseErr = expectField(lines, &pos, "Chain ID: ")
-	if parseErr != nil {
-		return nil, parseErr
+	// Chain ID is OPTIONAL per the SIWS spec (SIP-12); absent means mainnet.
+	if pos < len(lines) && strings.HasPrefix(lines[pos], "Chain ID: ") {
+		m.ChainID = strings.TrimPrefix(lines[pos], "Chain ID: ")
+		pos++
 	}
 	if m.ChainID == "" {
 		m.ChainID = "mainnet"

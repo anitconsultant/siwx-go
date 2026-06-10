@@ -1,0 +1,13 @@
+# Compiled binaries / build output
+/hub
+*.exe
+*.test
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# Editor / OS
+.DS_Store
+*.swp

@@ -2,14 +2,18 @@ name: scorecard
 on:
   push: { branches: [main] }
   schedule: [{ cron: '30 1 * * 1' }]
-permissions:
-  security-events: write
-  id-token: write
-  contents: read
-  actions: read
+# Top-level is read-only; the elevated writes live at the job level. The
+# OpenSSF publish step rejects results when id-token:write is set globally
+# (HTTP 400 "global perm is set to write"), so it must be scoped to the job.
+permissions: read-all
 jobs:
   analysis:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read         # checkout
+      actions: read          # scorecard reads workflow run data
+      security-events: write # upload SARIF to code scanning
+      id-token: write        # OIDC token used to publish results
     steps:
       - uses: actions/checkout@v4
         with: { persist-credentials: false }

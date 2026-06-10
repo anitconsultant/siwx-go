@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 	"github.com/anitconsultant/siwx-go/internal/testvectors"
 	"github.com/anitconsultant/siwx-go/siws"
 	"github.com/anitconsultant/siwx-go/siwx"
+	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
 )
 
 func loadCorpus(t *testing.T) *testvectors.Corpus {

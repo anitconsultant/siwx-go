@@ -9,8 +9,8 @@ import (
 const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 var (
-	bigZero  = big.NewInt(0)
-	bigBase  = big.NewInt(58)
+	bigZero     = big.NewInt(0)
+	bigBase     = big.NewInt(58)
 	alphabetIdx [128]int8 // rune -> index; -1 means not in alphabet
 )
 

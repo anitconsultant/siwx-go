@@ -6,20 +6,20 @@ import (
 	"os"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/anitconsultant/siwx-go/siwx"
-	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
-	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
 	hubmw "github.com/anitconsultant/siwx-go/examples/middleware"
+	"github.com/anitconsultant/siwx-go/siwx"
+	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
+	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
 	slog.SetDefault(log)
 
-	domain := env("SIWX_DOMAIN", "localhost")
-	addr := env("SIWX_ADDR", ":8080")
-	jwksURL := env("SIWX_JWKS_URL", "http://localhost:8080/.well-known/jwks.json")
+	domain := env("SIWX_DOMAIN", "localhost:8081")
+	addr := env("SIWX_ADDR", ":8081")
+	jwksURL := env("SIWX_JWKS_URL", "http://localhost:8081/.well-known/jwks.json")
 
 	issuer, err := newIssuer()
 	if err != nil {
@@ -56,12 +56,13 @@ func main() {
 	r.GET("/healthz", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
 
 	// Demo protected endpoint.
-	me := r.Group("/me")
-	me.Use(hubmw.JWTAuth(jwksURL, issuerURL, defaultAud))
-	me.GET("", hubmw.GetMe)
+	r.GET("/me", hubmw.JWTAuth(jwksURL, issuerURL, defaultAud), hubmw.GetMe)
 
-	// Static web files.
-	r.Static("/", "./examples/web")
+	// Static web files served explicitly to avoid Gin v1.9.1 wildcard conflicts.
+	webDir := "./examples/web"
+	r.GET("/", func(c *gin.Context) { c.File(webDir + "/index.html") })
+	r.GET("/app.js", func(c *gin.Context) { c.File(webDir + "/app.js") })
+	r.GET("/siwx-progress.js", func(c *gin.Context) { c.File(webDir + "/siwx-progress.js") })
 
 	log.Info("siwx-go hub starting", "addr", addr, "domain", domain)
 	if err := r.Run(addr); err != nil {

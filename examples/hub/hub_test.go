@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/anitconsultant/siwx-go/siws"
 	"github.com/anitconsultant/siwx-go/siwx"
 	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
+	"github.com/gin-gonic/gin"
 )
 
 func init() { gin.SetMode(gin.TestMode) }

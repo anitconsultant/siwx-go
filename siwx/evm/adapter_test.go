@@ -11,8 +11,8 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	siwelib "github.com/spruceid/siwe-go"
 
-	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
 	"github.com/anitconsultant/siwx-go/siwx"
+	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
 )
 
 type fixedClock struct{ t time.Time }

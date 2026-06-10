@@ -23,11 +23,11 @@ func TestParseCAIP2(t *testing.T) {
 		{"eip155:1", "eip155", "1", false},
 		{"eip155:137", "eip155", "137", false},
 		{"abc:xyz123", "abc", "xyz123", false},
-		{"ab:mainnet", "", "", true},           // namespace too short
-		{"toolongname:ref", "", "", true},       // namespace too long
-		{"Solana:mainnet", "", "", true},        // uppercase in namespace
-		{"solanamainnet", "", "", true},         // no colon
-		{"solana:", "", "", true},               // empty reference
+		{"ab:mainnet", "", "", true},                        // namespace too short
+		{"toolongname:ref", "", "", true},                   // namespace too long
+		{"Solana:mainnet", "", "", true},                    // uppercase in namespace
+		{"solanamainnet", "", "", true},                     // no colon
+		{"solana:", "", "", true},                           // empty reference
 		{"solana:" + strings.Repeat("a", 33), "", "", true}, // reference too long
 	}
 	for _, tc := range cases {

@@ -1,0 +1,78 @@
+package main
+
+import (
+	"log/slog"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/anitconsultant/siwx-go/siwx"
+	solanadapter "github.com/anitconsultant/siwx-go/siwx/solana"
+	evmadapter "github.com/anitconsultant/siwx-go/siwx/evm"
+	hubmw "github.com/anitconsultant/siwx-go/examples/middleware"
+)
+
+func main() {
+	log := slog.New(slog.NewJSONHandler(os.Stderr, nil))
+	slog.SetDefault(log)
+
+	domain := env("SIWX_DOMAIN", "localhost")
+	addr := env("SIWX_ADDR", ":8080")
+	jwksURL := env("SIWX_JWKS_URL", "http://localhost:8080/.well-known/jwks.json")
+
+	issuer, err := newIssuer()
+	if err != nil {
+		log.Error("failed to generate issuer key", "err", err)
+		os.Exit(1)
+	}
+
+	registry := siwx.NewRegistry()
+	registry.Register(solanadapter.New())
+	registry.Register(evmadapter.New())
+
+	recorder := newRecorder(log)
+
+	hub := &Hub{
+		domain:   domain,
+		registry: registry,
+		nonces:   newNonceStore(time.Now),
+		ids:      newIdentityStore(),
+		issuer:   issuer,
+		recorder: recorder,
+	}
+
+	r := gin.New()
+	r.Use(gin.Recovery())
+
+	// Auth endpoints.
+	r.GET("/auth/nonce", hub.getNonce)
+	r.POST("/auth/verify", hub.postVerify)
+	r.POST("/auth/link", hubmw.JWTAuth(jwksURL), hub.postLink)
+
+	// Well-known + observability.
+	r.GET("/.well-known/jwks.json", hub.getJWKS)
+	r.GET("/metrics", hub.getMetrics)
+	r.GET("/healthz", func(c *gin.Context) { c.String(http.StatusOK, "ok") })
+
+	// Demo protected endpoint.
+	me := r.Group("/me")
+	me.Use(hubmw.JWTAuth(jwksURL))
+	me.GET("", hubmw.GetMe)
+
+	// Static web files.
+	r.Static("/", "./examples/web")
+
+	log.Info("siwx-go hub starting", "addr", addr, "domain", domain)
+	if err := r.Run(addr); err != nil {
+		log.Error("server error", "err", err)
+		os.Exit(1)
+	}
+}
+
+func env(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}

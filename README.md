@@ -26,7 +26,7 @@ This follows the open standard [CAIP-122](https://github.com/ChainAgnostic/CAIPs
 - [Which package do I use?](#which-package-do-i-use)
 - [Example 1: Solana only (the `siws` package)](#example-1-solana-only-the-siws-package)
 - [Example 2: Solana and Ethereum (the `siwx` package)](#example-2-solana-and-ethereum-the-siwx-package)
-- [What you get back: the `Identity`](#what-you-get-back-the-identity)
+- [Who is the signed-in user? (the identity model)](#who-is-the-signed-in-user-the-identity-model)
 - [Handling errors](#handling-errors)
 - [Build a real login server (the demo hub)](#build-a-real-login-server-the-demo-hub)
 - [The browser side](#the-browser-side)
@@ -215,27 +215,96 @@ To add another chain later, you write one small adapter and call
 
 ---
 
-## What you get back: the `Identity`
+## Who is the signed-in user? (the identity model)
 
-When `siwx` verification succeeds, you get an `*siwx.Identity`. It holds the
-facts you can trust about the user:
+> **Read this first.** Wallet sign-in is **pseudonymous**. It proves that someone
+> controls a specific blockchain account — *"the holder of wallet X"* — **not**
+> their real-world identity. You get **no name, email, or age** unless you
+> collect that separately. Think *verified username*, not *passport*.
 
-```go
-type Identity struct {
-	Account   CAIP10     // who: chain + address, e.g. solana:mainnet:7xKX...
-	Domain    string     // the site name from the message
-	Nonce     string     // the one-time code that was used
-	IssuedAt  time.Time  // when the message was made
-	ExpiresAt *time.Time // when it stops being valid (may be nil)
-}
-```
+> **A note on the highlighting below:** the yellow highlight renders everywhere.
+> GitHub strips inline text color for security, so the red text shows in editors
+> like VS Code; on GitHub you'll see the same fields highlighted in **bold**.
 
-The most useful field is `Account`. Call `id.Account.String()` to get a stable
-id you can save in your database, like
-`eip155:1:0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B`.
+### 1. Proven by the signature — `siwx.Identity`
+
+These are the facts the wallet's signature **cryptographically proves**:
+
+| Property | Type | Example | What it tells you |
+|----------|------|---------|-------------------|
+| <mark style="background-color:#fff200;color:#c00"><b><code>Account</code></b></mark> | `CAIP10` | `eip155:1:0xAb58…aeC9B` | **The user's identity** — chain + address together |
+| `Account.ChainID.Namespace` | string | `eip155` / `solana` | Which chain family |
+| `Account.ChainID.Reference` | string | `1` / `mainnet` | Which specific network |
+| `Account.Address` | string | `0xAb58…aeC9B` | The wallet address (EIP‑55 hex, or base58 for Solana) |
+| `Domain` | string | `app.example.com` | The site they signed in to (yours) |
+| `Nonce` | string | `a1b2c3…` | The one-time code that was used |
+| `IssuedAt` | `time.Time` | `2026-06-10T21:00:00Z` | When the message was signed |
+| `ExpiresAt` | `*time.Time` | `2026-06-10T21:10:00Z` | When the message stops being valid (may be `nil`) |
 
 (The `siws` package returns a `*siws.Message` instead, with fields like
 `result.Address`, `result.Domain`, and `result.Nonce`.)
+
+### 2. Inside the login token — JWT claims
+
+The demo hub then issues a signed JWT. Decode it and you get:
+
+| Claim | Field | Example | Meaning |
+|-------|-------|---------|---------|
+| <mark style="background-color:#fff200;color:#c00"><b><code>sub</code></b></mark> | Subject | `7f3a…` | Stable internal **user id** (your account anchor, *not* the raw wallet) |
+| <mark style="background-color:#fff200;color:#c00"><b><code>wallets</code></b></mark> | custom | `["eip155:1:0xAb58…","solana:mainnet:7xKX…"]` | **All** wallets linked to this user |
+| `iss` | Issuer | `https://accounts.example.local` | Who issued the token |
+| `aud` | Audience | `siwx-go-demo` | Who the token is for |
+| `iat` | IssuedAt | `1760…` | When the token was issued |
+| `exp` | ExpiresAt | `1760…` | When the token expires (1 hour in the demo) |
+| `kid` *(header)* | Key ID | `mock-1` | Which key signed it (looked up in JWKS) |
+| `alg` *(header)* | Algorithm | `RS256` | Signature algorithm |
+
+One person can link several wallets (via `/auth/link`) and still be **one**
+account: `sub` is the stable **user**, and `wallets` lists their **addresses**.
+
+### 3. In the verify response body
+
+`POST /auth/verify` returns:
+
+| Field | Meaning |
+|-------|---------|
+| `token` | The JWT described above |
+| `identityId` | The same stable user id as `sub` |
+| `checks` | The verification trail — each check (`domain`, `not_before`, `expiry`, `nonce`, `signature`) with pass/fail + timing (what the demo stepper animates) |
+
+### 4. What you do NOT get
+
+| Not provided | Why |
+|--------------|-----|
+| Real name, email, phone | Wallets carry no personal info |
+| Age / location / KYC | Must be collected separately if you need it |
+| Account balance or token holdings | Sign-in never reads the chain |
+| A guarantee it's a unique human | One person can hold many wallets; a wallet can be shared |
+
+### ⭐ Which field do I store in my database?
+
+**Store the full CAIP‑10 account string** — `id.Account.String()` from the `siwx`
+result (the same value appears in the JWT `wallets` claim):
+
+> <mark style="background-color:#fff200;color:#c00"><b>Account.String() → e.g. eip155:1:0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B</b></mark>
+
+Two rules that matter:
+
+1. **Store the whole `Account` (chain **and** address), never just `Address`.**
+   The bare address `0xAb58…` is **not** unique — the *same* address exists on
+   every EVM chain. The CAIP‑10 string `eip155:1:0xAb58…` is globally unique, so
+   it is the **safe** key.
+2. **If one person can have several wallets** (the hub's `/auth/link` flow), make
+   <mark style="background-color:#fff200;color:#c00"><b><code>sub</code></b></mark>
+   (the `identityId`) your **user** primary key, and store each
+   <mark style="background-color:#fff200;color:#c00"><b><code>Account.String()</code></b></mark>
+   in a separate `wallets` table that points back to that `sub`.
+
+In short:
+
+- **Simple app** (one wallet = one user): primary key = **`Account.String()`**.
+- **Multi-wallet app**: user primary key = **`sub` / `identityId`**, with a
+  `wallets` table of **`Account.String()`** values linked to it.
 
 ---
 

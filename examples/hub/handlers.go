@@ -1,12 +1,10 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/anitconsultant/siwx-go/siwx"
@@ -52,12 +50,15 @@ func requestID(c *gin.Context) string {
 // getNonce handles GET /auth/nonce
 func (h *Hub) getNonce(c *gin.Context) {
 	ctx := c.Request.Context()
-	nonce, err := h.nonces.Issue(ctx, 10*time.Minute)
+	nonce, err := h.nonces.Issue(ctx, nonceTTL)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "nonce issue failed"})
 		return
 	}
 	h.recorder.counters.incNonceIssued()
+	// Bind the nonce to this client in an HttpOnly cookie so verify/link read
+	// the expected nonce from a channel WE control, not the message body.
+	setNonceCookie(c, nonce)
 	c.JSON(http.StatusOK, gin.H{"nonce": nonce, "domain": h.domain})
 }
 
@@ -100,15 +101,20 @@ func (h *Hub) postVerify(c *gin.Context) {
 		return
 	}
 
-	// Extract nonce from the raw message for NonceStore.Burn.
-	nonce := extractNonce(msg)
-	if nonce == "" {
-		writeProblem(c, siwx.ErrMalformed, reqID)
+	// Anti-replay: the expected nonce is the value WE issued to this client,
+	// carried in an HttpOnly cookie by GET /auth/nonce — never re-derived from the
+	// attacker-controlled message. This makes the library's ExpectedNonce check
+	// load-bearing (a forged/replayed message carrying a different nonce fails the
+	// in-library comparison) rather than a comparison of the message against itself.
+	expectedNonce, _ := c.Cookie(nonceCookie)
+	if expectedNonce == "" {
+		writeProblem(c, siwx.ErrNonceMismatch, reqID)
 		return
 	}
+	clearNonceCookie(c)
 
-	// Burn nonce first: reject if unknown/expired/reused.
-	if err := h.nonces.Burn(ctx, nonce); err != nil {
+	// Burn first: reject if unknown/expired/reused.
+	if err := h.nonces.Burn(ctx, expectedNonce); err != nil {
 		writeProblem(c, siwx.ErrNonceMismatch, reqID)
 		return
 	}
@@ -117,7 +123,7 @@ func (h *Hub) postVerify(c *gin.Context) {
 	attemptID := newAttemptID()
 	opts := siwx.VerifyOpts{
 		ExpectedDomain: h.domain,
-		ExpectedNonce:  nonce,
+		ExpectedNonce:  expectedNonce,
 		Observer:       h.recorder,
 		Clock:          siwx.RealClock{},
 		AttemptID:      attemptID,
@@ -189,23 +195,24 @@ func (h *Hub) postLink(c *gin.Context) {
 		return
 	}
 
-	nonce := extractNonce(msg)
-	if nonce == "" {
-		writeProblem(c, siwx.ErrMalformed, reqID)
+	expectedNonce, _ := c.Cookie(nonceCookie)
+	if expectedNonce == "" {
+		writeProblem(c, siwx.ErrNonceMismatch, reqID)
 		return
 	}
-	if err := h.nonces.Burn(ctx, nonce); err != nil {
+	clearNonceCookie(c)
+	if err := h.nonces.Burn(ctx, expectedNonce); err != nil {
 		writeProblem(c, siwx.ErrNonceMismatch, reqID)
 		return
 	}
 
 	opts := siwx.VerifyOpts{
 		ExpectedDomain: h.domain,
-		ExpectedNonce:  nonce,
+		ExpectedNonce:  expectedNonce,
 		Observer:       h.recorder,
 		Clock:          siwx.RealClock{},
 	}
-	id, verifyErr := h.registry.Verify(context.Background(), chainID, msg, sig, opts)
+	id, verifyErr := h.registry.Verify(ctx, chainID, msg, sig, opts)
 	if verifyErr != nil {
 		writeProblem(c, verifyErr, reqID)
 		return
@@ -233,14 +240,26 @@ func (h *Hub) getMetrics(c *gin.Context) {
 	c.String(http.StatusOK, h.recorder.counters.render())
 }
 
-// extractNonce parses the Nonce field from a raw SIWS/SIWE message.
-func extractNonce(msg []byte) string {
-	for _, line := range strings.Split(string(msg), "\n") {
-		if strings.HasPrefix(line, "Nonce: ") {
-			return strings.TrimSpace(strings.TrimPrefix(line, "Nonce: "))
-		}
-	}
-	return ""
+// nonceCookie carries the server-issued nonce back to verify/link so the
+// expected nonce comes from a channel the server controls, not the message body.
+const nonceCookie = "siwx_nonce"
+
+// nonceTTL is how long an issued nonce (and its cookie) remains valid.
+const nonceTTL = 10 * time.Minute
+
+// setNonceCookie stores the issued nonce in an HttpOnly, SameSite=Lax cookie
+// scoped to this client. Secure is false for the http://localhost demo; behind
+// TLS in production this must be set true.
+func setNonceCookie(c *gin.Context, nonce string) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(nonceCookie, nonce, int(nonceTTL.Seconds()), "/", "", false, true)
+}
+
+// clearNonceCookie deletes the nonce cookie after a verify/link attempt so each
+// issued nonce is presented at most once per client.
+func clearNonceCookie(c *gin.Context) {
+	c.SetSameSite(http.SameSiteLaxMode)
+	c.SetCookie(nonceCookie, "", -1, "/", "", false, true)
 }
 
 // newAttemptID generates a random 16-byte hex string.

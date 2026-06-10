@@ -8,6 +8,11 @@ import (
 // alphabet is the Bitcoin/Solana base58 alphabet.
 const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
+// maxBase58Len bounds DecodeBase58 input. Base58 → base256 conversion is O(n²),
+// so an unbounded input is a CPU-DoS vector. A 32-byte Solana key encodes to at
+// most 44 chars; 128 is a generous cap that keeps the decoder constant-bounded.
+const maxBase58Len = 128
+
 var (
 	bigZero     = big.NewInt(0)
 	bigBase     = big.NewInt(58)
@@ -26,6 +31,9 @@ func init() {
 // DecodeBase58 decodes a base58-encoded string into bytes.
 // Returns ErrMalformed (wrapped) if any character is outside the alphabet.
 func DecodeBase58(s string) ([]byte, error) {
+	if len(s) > maxBase58Len {
+		return nil, fmt.Errorf("base58: input too long: %w", ErrMalformed)
+	}
 	n := new(big.Int)
 	for _, r := range s {
 		if r > 127 || alphabetIdx[r] < 0 {

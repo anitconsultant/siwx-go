@@ -46,6 +46,7 @@ func main() {
 
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(limitBody(maxBodyBytes))
 
 	// Auth endpoints.
 	r.GET("/auth/nonce", hub.getNonce)
@@ -90,4 +91,18 @@ func buildDomain(host, port string) string {
 		return host
 	}
 	return host + ":" + port
+}
+
+// maxBodyBytes bounds request bodies. SIWS/SIWE verify payloads are < 1 KB; an
+// 8 KiB cap stops unauthenticated callers from feeding a huge message into the
+// O(n²) base58 decode on the verify path.
+const maxBodyBytes = 8 << 10
+
+// limitBody caps each request body at n bytes. Reads past the limit fail, so
+// oversized payloads surface as ErrMalformed (400) instead of burning CPU.
+func limitBody(n int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, n)
+		c.Next()
+	}
 }

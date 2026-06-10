@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+// maxMessageBytes bounds ParseMessage input. SIWS/SIWE messages are well under
+// 1 KB; 8 KiB is a generous cap that keeps the parser (and the O(n²) base58
+// decode of the address line) safe regardless of caller.
+const maxMessageBytes = 8 << 10
+
 // ParseMessage parses raw SIWS message bytes into a Message.
 // The input must use LF line endings; CRLF is rejected as malformed.
 // A single trailing newline on the last line is accepted.
@@ -15,6 +20,9 @@ import (
 // returns ErrMalformed. All errors wrap ErrMalformed and name the offending
 // field without echoing its value (S4).
 func ParseMessage(b []byte) (*Message, error) {
+	if len(b) > maxMessageBytes {
+		return nil, fmt.Errorf("parse: message too large: %w", ErrMalformed)
+	}
 	if bytes.ContainsRune(b, '\r') {
 		return nil, fmt.Errorf("parse: CRLF line endings not allowed: %w", ErrMalformed)
 	}

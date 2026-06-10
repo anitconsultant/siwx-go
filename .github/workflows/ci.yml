@@ -1,0 +1,58 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+permissions: { contents: read }
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: ['1.24', '1.25']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '${{ matrix.go }}' }
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - name: staticcheck
+        if: runner.os == 'Linux'
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+      - name: govulncheck
+        if: runner.os == 'Linux'
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - run: go test -race -coverprofile=cover.out ./...
+      - name: coverage gates
+        if: runner.os == 'Linux'
+        run: |
+          go test -coverprofile=siws.out ./siws/... && go tool cover -func=siws.out | tail -1
+          go test -coverprofile=siwx.out ./siwx/... && go tool cover -func=siwx.out | tail -1
+          # WT-D: replace the prints above with hard threshold checks (siws>=95, siwx>=90)
+  zero-dep-siws:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.25' }
+      - name: siws must be stdlib-only
+        run: |
+          deps=$(go list -deps ./siws | grep -v "^github.com/anitconsultant/siwx-go" | grep "\." | grep "/" || true)
+          if [ -n "$deps" ]; then echo "siws has external deps:"; echo "$deps"; exit 1; fi
+  fuzz-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.25' }
+      - name: 60s per fuzz target
+        run: |
+          # WT-D: enumerate targets explicitly once they exist
+          for t in $(grep -rl "func Fuzz" --include="*_test.go" . | sort -u); do
+            pkg=$(dirname "$t")
+            for fn in $(grep -o "func Fuzz[A-Za-z0-9_]*" "$t" | awk '{print $2}'); do
+              go test -run=^$ -fuzz="^${fn}$" -fuzztime=60s "./$pkg" || exit 1
+            done
+          done

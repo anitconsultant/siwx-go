@@ -1,0 +1,115 @@
+{
+  "description": "SIWS test vectors. Reference time for validity checks: 2026-06-09T12:00:00Z. Signatures are Ed25519 over the raw UTF-8 bytes of `message`. Encodings: base58 for addresses, base64 for signatures and raw message bytes.",
+  "referenceTime": "2026-06-09T12:00:00.000Z",
+  "keys": [
+    {
+      "id": "key0",
+      "publicKeyBase58": "DFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA",
+      "privateSeedBase64": "vEbQphVZ1q6wyNRVvrxjuFHQ3UMtp/Smr7JvHacWb74=",
+      "note": "TEST KEY ONLY - never use in production"
+    },
+    {
+      "id": "key1",
+      "publicKeyBase58": "FdSXoQtDKu3xNDbfXsRmhKfiaB6taaSmsVf2MtWeoKHT",
+      "privateSeedBase64": "qn5C+siMFGlWCWDPkMDX1VG2sIc+UNxkGcwi0hSFEQc=",
+      "note": "TEST KEY ONLY - never use in production"
+    },
+    {
+      "id": "key2",
+      "publicKeyBase58": "G4Cr1UVxARuav6r4CcAHtdes75fjkjcPTY225Qx6XYic",
+      "privateSeedBase64": "HX/4EIku1B4+ahGsz3pjSJ7Whc6ALOAxtZH1dFATXdc=",
+      "note": "TEST KEY ONLY - never use in production"
+    }
+  ],
+  "valid": [
+    {
+      "name": "basic_with_expiry",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nDFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\nSign in to dapp.academy\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: 32891756dCb1\nIssued At: 2026-06-09T11:59:00.000Z\nExpiration Time: 2026-06-09T12:09:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKREZBdnhQZ3kzQnRBTlduVDRFaVdhYjVrY1hXWTh1NXdncVVZNWJycGFZYkEKClNpZ24gaW4gdG8gZGFwcC5hY2FkZW15CgpVUkk6IGh0dHBzOi8vZGFwcC5hY2FkZW15L2xvZ2luClZlcnNpb246IDEKQ2hhaW4gSUQ6IG1haW5uZXQKTm9uY2U6IDMyODkxNzU2ZENiMQpJc3N1ZWQgQXQ6IDIwMjYtMDYtMDlUMTE6NTk6MDAuMDAwWgpFeHBpcmF0aW9uIFRpbWU6IDIwMjYtMDYtMDlUMTI6MDk6MDAuMDAwWg==",
+      "signatureBase64": "M2u61oVpC9aYuaz1jVwcptn3cuxyRxup2/p5xlm00YuydIn8NBKYUjP7b7RCAq8kzch1Cbe7KV6IiTttEc+gDA==",
+      "note": "Happy path: statement, expiry window open at reference time"
+    },
+    {
+      "name": "no_statement_no_expiry",
+      "key": "key1",
+      "message": "nexus.dapp.academy wants you to sign in with your Solana account:\nFdSXoQtDKu3xNDbfXsRmhKfiaB6taaSmsVf2MtWeoKHT\n\nURI: https://nexus.dapp.academy\nVersion: 1\nChain ID: mainnet\nNonce: aF9x2Lq8Mn4p\nIssued At: 2026-06-09T11:59:30.000Z",
+      "messageBase64": "bmV4dXMuZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKRmRTWG9RdERLdTN4TkRiZlhzUm1oS2ZpYUI2dGFhU21zVmYyTXRXZW9LSFQKClVSSTogaHR0cHM6Ly9uZXh1cy5kYXBwLmFjYWRlbXkKVmVyc2lvbjogMQpDaGFpbiBJRDogbWFpbm5ldApOb25jZTogYUY5eDJMcThNbjRwCklzc3VlZCBBdDogMjAyNi0wNi0wOVQxMTo1OTozMC4wMDBa",
+      "signatureBase64": "mL5nBA+XLH+YlgyKZs/WLUdXJhUh23CrBOt1VCtlOXUGQXt/53Z25qJOTfEKvsn8OdXLbMVh+Ln/4ZjRSQDPBQ==",
+      "note": "Optional statement and expiration omitted"
+    },
+    {
+      "name": "with_not_before_devnet",
+      "key": "key2",
+      "message": "dip.dapp.academy wants you to sign in with your Solana account:\nG4Cr1UVxARuav6r4CcAHtdes75fjkjcPTY225Qx6XYic\n\nInsurance portal access\n\nURI: https://dip.dapp.academy/auth\nVersion: 1\nChain ID: devnet\nNonce: Zz7Kp3Qr9Wt2\nIssued At: 2026-06-09T11:58:00.000Z\nExpiration Time: 2026-06-09T12:08:00.000Z\nNot Before: 2026-06-09T11:59:00.000Z",
+      "messageBase64": "ZGlwLmRhcHAuYWNhZGVteSB3YW50cyB5b3UgdG8gc2lnbiBpbiB3aXRoIHlvdXIgU29sYW5hIGFjY291bnQ6Ckc0Q3IxVVZ4QVJ1YXY2cjRDY0FIdGRlczc1ZmpramNQVFkyMjVReDZYWWljCgpJbnN1cmFuY2UgcG9ydGFsIGFjY2VzcwoKVVJJOiBodHRwczovL2RpcC5kYXBwLmFjYWRlbXkvYXV0aApWZXJzaW9uOiAxCkNoYWluIElEOiBkZXZuZXQKTm9uY2U6IFp6N0twM1FyOVd0MgpJc3N1ZWQgQXQ6IDIwMjYtMDYtMDlUMTE6NTg6MDAuMDAwWgpFeHBpcmF0aW9uIFRpbWU6IDIwMjYtMDYtMDlUMTI6MDg6MDAuMDAwWgpOb3QgQmVmb3JlOiAyMDI2LTA2LTA5VDExOjU5OjAwLjAwMFo=",
+      "signatureBase64": "D1C7VFqV+6F0GCYPUFpBS2m6vegcxcaDcroLKXCGVlPik1vIOQ7TqHGDk9NmU5fPMJNwqueYcFwFkQdQr1mDAw==",
+      "note": "All optional time fields present, devnet chain id"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "tampered_nonce",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nDFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\nSign in to dapp.academy\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: 32891756dCb2\nIssued At: 2026-06-09T11:59:00.000Z\nExpiration Time: 2026-06-09T12:09:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKREZBdnhQZ3kzQnRBTlduVDRFaVdhYjVrY1hXWTh1NXdncVVZNWJycGFZYkEKClNpZ24gaW4gdG8gZGFwcC5hY2FkZW15CgpVUkk6IGh0dHBzOi8vZGFwcC5hY2FkZW15L2xvZ2luClZlcnNpb246IDEKQ2hhaW4gSUQ6IG1haW5uZXQKTm9uY2U6IDMyODkxNzU2ZENiMgpJc3N1ZWQgQXQ6IDIwMjYtMDYtMDlUMTE6NTk6MDAuMDAwWgpFeHBpcmF0aW9uIFRpbWU6IDIwMjYtMDYtMDlUMTI6MDk6MDAuMDAwWg==",
+      "signatureBase64": "M2u61oVpC9aYuaz1jVwcptn3cuxyRxup2/p5xlm00YuydIn8NBKYUjP7b7RCAq8kzch1Cbe7KV6IiTttEc+gDA==",
+      "expectedError": "ErrBadSignature",
+      "note": "Signature was made over original message; nonce byte changed after signing"
+    },
+    {
+      "name": "wrong_key",
+      "key": "key1",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nFdSXoQtDKu3xNDbfXsRmhKfiaB6taaSmsVf2MtWeoKHT\n\nSign in\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: Qq1Ww2Ee3Rr4\nIssued At: 2026-06-09T11:59:00.000Z\nExpiration Time: 2026-06-09T12:09:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKRmRTWG9RdERLdTN4TkRiZlhzUm1oS2ZpYUI2dGFhU21zVmYyTXRXZW9LSFQKClNpZ24gaW4KClVSSTogaHR0cHM6Ly9kYXBwLmFjYWRlbXkvbG9naW4KVmVyc2lvbjogMQpDaGFpbiBJRDogbWFpbm5ldApOb25jZTogUXExV3cyRWUzUnI0Cklzc3VlZCBBdDogMjAyNi0wNi0wOVQxMTo1OTowMC4wMDBaCkV4cGlyYXRpb24gVGltZTogMjAyNi0wNi0wOVQxMjowOTowMC4wMDBa",
+      "signatureBase64": "he0Yy6X6Cm7YKTsAxKwp0GcWqUqgZSG0j5mrUFH+2JRzHbazoys2nw5738Oe/X6dV+ZME8xSZY6qxtsS4DemBg==",
+      "expectedError": "ErrBadSignature",
+      "note": "Message embeds key1 address but was signed by key0"
+    },
+    {
+      "name": "expired",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nDFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\nSign in\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: Tt5Yy6Uu7Ii8\nIssued At: 2026-06-09T11:40:00.000Z\nExpiration Time: 2026-06-09T11:50:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKREZBdnhQZ3kzQnRBTlduVDRFaVdhYjVrY1hXWTh1NXdncVVZNWJycGFZYkEKClNpZ24gaW4KClVSSTogaHR0cHM6Ly9kYXBwLmFjYWRlbXkvbG9naW4KVmVyc2lvbjogMQpDaGFpbiBJRDogbWFpbm5ldApOb25jZTogVHQ1WXk2VXU3SWk4Cklzc3VlZCBBdDogMjAyNi0wNi0wOVQxMTo0MDowMC4wMDBaCkV4cGlyYXRpb24gVGltZTogMjAyNi0wNi0wOVQxMTo1MDowMC4wMDBa",
+      "signatureBase64": "NBHAX1OGvKfIMOuzAKLrwnfjZZvPBRQmgD0eL3jXk4d2M7tgkqS2U6k5xY+GPYblhyorHz5iXOnTeuRsUFVlBA==",
+      "expectedError": "ErrExpired",
+      "note": "Expiration Time is before reference time; signature itself is valid"
+    },
+    {
+      "name": "not_yet_valid",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nDFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\nSign in\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: Oo9Pp0Aa1Ss2\nIssued At: 2026-06-09T11:59:00.000Z\nExpiration Time: 2026-06-09T12:30:00.000Z\nNot Before: 2026-06-09T12:05:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKREZBdnhQZ3kzQnRBTlduVDRFaVdhYjVrY1hXWTh1NXdncVVZNWJycGFZYkEKClNpZ24gaW4KClVSSTogaHR0cHM6Ly9kYXBwLmFjYWRlbXkvbG9naW4KVmVyc2lvbjogMQpDaGFpbiBJRDogbWFpbm5ldApOb25jZTogT285UHAwQWExU3MyCklzc3VlZCBBdDogMjAyNi0wNi0wOVQxMTo1OTowMC4wMDBaCkV4cGlyYXRpb24gVGltZTogMjAyNi0wNi0wOVQxMjozMDowMC4wMDBaCk5vdCBCZWZvcmU6IDIwMjYtMDYtMDlUMTI6MDU6MDAuMDAwWg==",
+      "signatureBase64": "jFNh+l/6Op20SU609WV1Ag/EFha5vqO/bcfGSZ4wF20j5yEe8j72NqBEE8Wy0SJ+fr+Bj7qOniJWgmvM25VTDA==",
+      "expectedError": "ErrNotYetValid",
+      "note": "Not Before is after reference time; signature itself is valid"
+    },
+    {
+      "name": "malformed_missing_address",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\n\nURI: https://dapp.academy\nVersion: 1\nChain ID: mainnet\nNonce: Dd3Ff4Gg5Hh6\nIssued At: 2026-06-09T12:00:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKClVSSTogaHR0cHM6Ly9kYXBwLmFjYWRlbXkKVmVyc2lvbjogMQpDaGFpbiBJRDogbWFpbm5ldApOb25jZTogRGQzRmY0R2c1SGg2Cklzc3VlZCBBdDogMjAyNi0wNi0wOVQxMjowMDowMC4wMDBa",
+      "signatureBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+      "expectedError": "ErrMalformed",
+      "note": "Address line empty; must fail at parse, never reach crypto"
+    },
+    {
+      "name": "garbage_signature_length",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nDFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\nSign in to dapp.academy\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: 32891756dCb1\nIssued At: 2026-06-09T11:59:00.000Z\nExpiration Time: 2026-06-09T12:09:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKREZBdnhQZ3kzQnRBTlduVDRFaVdhYjVrY1hXWTh1NXdncVVZNWJycGFZYkEKClNpZ24gaW4gdG8gZGFwcC5hY2FkZW15CgpVUkk6IGh0dHBzOi8vZGFwcC5hY2FkZW15L2xvZ2luClZlcnNpb246IDEKQ2hhaW4gSUQ6IG1haW5uZXQKTm9uY2U6IDMyODkxNzU2ZENiMQpJc3N1ZWQgQXQ6IDIwMjYtMDYtMDlUMTE6NTk6MDAuMDAwWgpFeHBpcmF0aW9uIFRpbWU6IDIwMjYtMDYtMDlUMTI6MDk6MDAuMDAwWg==",
+      "signatureBase64": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==",
+      "expectedError": "ErrBadSignature",
+      "note": "Signature is 31 bytes, Ed25519 requires exactly 64"
+    },
+    {
+      "name": "domain_mismatch_check",
+      "key": "key0",
+      "message": "dapp.academy wants you to sign in with your Solana account:\nDFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\nSign in to dapp.academy\n\nURI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\nNonce: 32891756dCb1\nIssued At: 2026-06-09T11:59:00.000Z\nExpiration Time: 2026-06-09T12:09:00.000Z",
+      "messageBase64": "ZGFwcC5hY2FkZW15IHdhbnRzIHlvdSB0byBzaWduIGluIHdpdGggeW91ciBTb2xhbmEgYWNjb3VudDoKREZBdnhQZ3kzQnRBTlduVDRFaVdhYjVrY1hXWTh1NXdncVVZNWJycGFZYkEKClNpZ24gaW4gdG8gZGFwcC5hY2FkZW15CgpVUkk6IGh0dHBzOi8vZGFwcC5hY2FkZW15L2xvZ2luClZlcnNpb246IDEKQ2hhaW4gSUQ6IG1haW5uZXQKTm9uY2U6IDMyODkxNzU2ZENiMQpJc3N1ZWQgQXQ6IDIwMjYtMDYtMDlUMTE6NTk6MDAuMDAwWgpFeHBpcmF0aW9uIFRpbWU6IDIwMjYtMDYtMDlUMTI6MDk6MDAuMDAwWg==",
+      "signatureBase64": "M2u61oVpC9aYuaz1jVwcptn3cuxyRxup2/p5xlm00YuydIn8NBKYUjP7b7RCAq8kzch1Cbe7KV6IiTttEc+gDA==",
+      "expectedError": "ErrDomainMismatch",
+      "note": "Valid message and signature, but verifier configured with expected domain evil.example; domain check must fail before or regardless of signature validity ordering documented in spec"
+    }
+  ]
+}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -248,6 +249,127 @@ func TestInvariantObserverNoSensitiveData(t *testing.T) {
 	for _, ae := range obs.attempts {
 		if ae.Namespace != "solana" {
 			t.Errorf("VerifyAttempt.Namespace unexpected: %q", ae.Namespace)
+		}
+	}
+}
+
+// Invariant: corpus loadCorpus panics cleanly when index is out of bounds.
+func TestCorpusHasValidVectors(t *testing.T) {
+	c := loadCorpus(t)
+	if len(c.Valid) == 0 {
+		t.Fatal("corpus has no valid vectors — subsequent c.Valid[N] calls would panic")
+	}
+	if len(c.Invalid) == 0 {
+		t.Fatal("corpus has no invalid vectors")
+	}
+}
+
+// Invariant (S4): Error text from VerifyRaw never echoes attacker-controlled
+// field values. Only field names and sentinel descriptions are allowed.
+func TestInvariantS4ErrorTextNeverEchoesInput(t *testing.T) {
+	c := loadCorpus(t)
+	ref := c.ReferenceTime
+
+	marker := "ATTACKER_MARKER_12345"
+
+	// For each well-formed field we inject the marker, expecting ErrMalformed or
+	// a sentinel — but never the marker reflected back in the error text.
+	cases := []struct {
+		name string
+		msg  string
+		opts siws.VerifyOpts
+	}{
+		{
+			name: "marker_in_statement",
+			msg: "dapp.academy wants you to sign in with your Solana account:\n" +
+				"DFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\n" +
+				marker + "\n\n" +
+				"URI: https://dapp.academy/login\nVersion: 1\nChain ID: mainnet\n" +
+				"Nonce: 32891756dCb1\nIssued At: 2026-06-09T11:59:00.000Z\n" +
+				"Expiration Time: 2026-06-09T12:09:00.000Z",
+			opts: siws.VerifyOpts{
+				ExpectedDomain: "dapp.academy",
+				ExpectedNonce:  "32891756dCb1",
+				Now:            func() time.Time { return ref },
+			},
+		},
+		{
+			name: "marker_as_nonce",
+			msg: "dapp.academy wants you to sign in with your Solana account:\n" +
+				"DFAvxPgy3BtANWnT4EiWab5kcXWY8u5wgqUY5brpaYbA\n\n" +
+				"URI: https://dapp.academy\nVersion: 1\nChain ID: mainnet\n" +
+				"Nonce: " + marker + "\nIssued At: 2026-06-09T11:59:00.000Z",
+			opts: siws.VerifyOpts{
+				ExpectedDomain: "dapp.academy",
+				ExpectedNonce:  "wrongnonce000",
+				Now:            func() time.Time { return ref },
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := siws.VerifyRaw([]byte(tc.msg), make([]byte, 64), tc.opts)
+			if err == nil {
+				return // passes without error — marker not reflected
+			}
+			if strings.Contains(err.Error(), marker) {
+				t.Errorf("S4 violation: error text echoes attacker marker: %v", err)
+			}
+		})
+	}
+}
+
+// Invariant (S5 extended): Observer events on a failing verification also carry
+// no sensitive data. Covers all event types and the failure path.
+func TestInvariantObserverNoSensitiveDataOnFailure(t *testing.T) {
+	c := loadCorpus(t)
+	if len(c.Invalid) == 0 {
+		t.Fatal("no invalid vectors")
+	}
+	// Use the first invalid vector (tampered_nonce — bad signature, valid structure).
+	v := c.Invalid[0]
+	domain, nonce := testvectors.ExtractDomainNonce(v.Message)
+	if domain == "" {
+		domain = "placeholder.example"
+	}
+	if nonce == "" {
+		nonce = "placeholder000"
+	}
+
+	r := siwx.NewRegistry()
+	r.Register(solanadapter.New())
+	obs := &captureObserver{}
+	opts := siwx.VerifyOpts{
+		ExpectedDomain: domain,
+		ExpectedNonce:  nonce,
+		Observer:       obs,
+		Clock:          c.FrozenClock(),
+	}
+	chainID := siwx.CAIP2{Namespace: "solana", Reference: "mainnet"}
+	_, err := r.Verify(context.Background(), chainID, v.Message, v.Signature, opts)
+	if err == nil {
+		t.Fatal("expected error for invalid vector, got nil")
+	}
+
+	// Check events contain no raw signature or message bytes.
+	for _, pr := range obs.parses {
+		if pr.MsgBytes != len(v.Message) {
+			t.Errorf("ParseResult.MsgBytes is not the byte count: got %d, len(msg)=%d", pr.MsgBytes, len(v.Message))
+		}
+	}
+	for _, cr := range obs.checks {
+		if bytes.Contains([]byte(cr.AttemptID), v.Signature) {
+			t.Error("CheckResult.AttemptID contains raw signature bytes")
+		}
+		if bytes.Contains([]byte(string(cr.Check)), v.Signature) {
+			t.Error("CheckResult.Check contains raw signature bytes")
+		}
+	}
+	for _, vr := range obs.results {
+		if bytes.Contains([]byte(vr.AttemptID), v.Signature) {
+			t.Error("VerifyResult.AttemptID contains raw signature bytes")
 		}
 	}
 }

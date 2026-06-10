@@ -47,10 +47,9 @@ func (m *mockIssuer) Issue(_ context.Context, identityID string, wallets []siwx.
 	for i, w := range wallets {
 		ws[i] = w.String()
 	}
+	// sub is the stable identity anchor, not the wallet address.
+	// Wallets (including the primary) are carried in the wallets claim.
 	sub := identityID
-	if len(ws) > 0 {
-		sub = ws[0]
-	}
 	claims := hubClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   sub,

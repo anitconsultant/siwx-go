@@ -95,9 +95,10 @@ func (c *jwksCache) refresh(kid string) (*rsa.PublicKey, error) {
 }
 
 // JWTAuth returns a Gin middleware that validates RS256 JWTs using the JWKS
-// at jwksURL. On success, it injects the claims into the Gin context under
-// the key "jwtClaims". On failure, it aborts with 401.
-func JWTAuth(jwksURL string) gin.HandlerFunc {
+// at jwksURL. expectedIssuer and expectedAud are validated against the token
+// claims (iss and aud). On success, claims are injected under "jwtClaims".
+// On failure, aborts with 401.
+func JWTAuth(jwksURL, expectedIssuer, expectedAud string) gin.HandlerFunc {
 	cache := newJWKSCache(jwksURL)
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -118,7 +119,11 @@ func JWTAuth(jwksURL string) gin.HandlerFunc {
 			}
 			kid, _ := t.Header["kid"].(string)
 			return cache.get(kid)
-		}, jwt.WithValidMethods([]string{"RS256"}))
+		},
+			jwt.WithValidMethods([]string{"RS256"}),
+			jwt.WithIssuer(expectedIssuer),
+			jwt.WithAudience(expectedAud),
+		)
 
 		if err != nil || !token.Valid {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

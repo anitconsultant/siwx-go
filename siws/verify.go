@@ -35,7 +35,13 @@ func (o VerifyOpts) now() time.Time {
 // whatever bytes the wallet actually received, so no re-serialization occurs.
 //
 // Check order (S3): domain → not-before → expiry → nonce → Ed25519.
+//
+// Both ExpectedDomain and ExpectedNonce must be non-empty; empty values are a
+// programmer error and return ErrMalformed immediately.
 func VerifyRaw(msg, sig []byte, opts VerifyOpts) (*Message, error) {
+	if opts.ExpectedDomain == "" || opts.ExpectedNonce == "" {
+		return nil, fmt.Errorf("verify: ExpectedDomain and ExpectedNonce are required: %w", ErrMalformed)
+	}
 	m, err := ParseMessage(msg)
 	if err != nil {
 		return nil, err
@@ -60,10 +66,17 @@ func VerifyRaw(msg, sig []byte, opts VerifyOpts) (*Message, error) {
 }
 
 // Verify verifies sig against the re-serialized form of m (m.String()).
-// Prefer VerifyRaw when the original signed bytes are available, because
-// re-serialization may differ from what the wallet signed if the message was
-// not produced by this library.
+//
+// DEPRECATED: prefer VerifyRaw, which verifies the exact bytes that the wallet
+// signed. This method re-serializes the parsed struct via String(), so if any
+// timestamp or optional field was stored in a non-canonical format during
+// parsing, the re-serialized bytes will differ from what was signed and
+// verification will fail with ErrBadSignature even for a valid signature.
+// Use VerifyRaw(rawBytes, sig, opts) whenever the original wire bytes are available.
 func (m *Message) Verify(sig []byte, opts VerifyOpts) error {
+	if opts.ExpectedDomain == "" || opts.ExpectedNonce == "" {
+		return fmt.Errorf("verify: ExpectedDomain and ExpectedNonce are required: %w", ErrMalformed)
+	}
 	if err := checkDomain(m, opts.ExpectedDomain); err != nil {
 		return err
 	}

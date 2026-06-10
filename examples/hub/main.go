@@ -48,7 +48,7 @@ func main() {
 	// Auth endpoints.
 	r.GET("/auth/nonce", hub.getNonce)
 	r.POST("/auth/verify", hub.postVerify)
-	r.POST("/auth/link", hubmw.JWTAuth(jwksURL), hub.postLink)
+	r.POST("/auth/link", hubmw.JWTAuth(jwksURL, issuerURL, defaultAud), hub.postLink)
 
 	// Well-known + observability.
 	r.GET("/.well-known/jwks.json", hub.getJWKS)
@@ -57,7 +57,7 @@ func main() {
 
 	// Demo protected endpoint.
 	me := r.Group("/me")
-	me.Use(hubmw.JWTAuth(jwksURL))
+	me.Use(hubmw.JWTAuth(jwksURL, issuerURL, defaultAud))
 	me.GET("", hubmw.GetMe)
 
 	// Static web files.

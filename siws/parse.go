@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"time"
-	"unicode"
 )
 
 // ParseMessage parses raw SIWS message bytes into a Message.
@@ -205,13 +204,15 @@ func isFieldPrefix(s string) bool {
 	return false
 }
 
-// validNonce reports whether s is 8+ alphanumeric characters.
+// validNonce reports whether s is 8+ ASCII alphanumeric characters [a-zA-Z0-9].
+// Unicode letters and digits are explicitly rejected to match the CAIP-122 spec
+// character set and avoid normalization ambiguity.
 func validNonce(s string) bool {
 	if len(s) < 8 {
 		return false
 	}
 	for _, r := range s {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+		if !('a' <= r && r <= 'z') && !('A' <= r && r <= 'Z') && !('0' <= r && r <= '9') {
 			return false
 		}
 	}

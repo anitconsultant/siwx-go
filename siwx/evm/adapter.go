@@ -5,6 +5,7 @@ package evm
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
 	"time"
@@ -78,7 +79,8 @@ func (a adapter) Verify(ctx context.Context, msg []byte, sig []byte, opts siwx.V
 			return nil
 		}},
 		{siwx.CheckNonce, func() error {
-			if parsed.GetNonce() != opts.ExpectedNonce {
+			// Constant-time comparison to resist timing side-channels (S8).
+			if subtle.ConstantTimeCompare([]byte(parsed.GetNonce()), []byte(opts.ExpectedNonce)) != 1 {
 				return fmt.Errorf("%w", siwx.ErrNonceMismatch)
 			}
 			return nil

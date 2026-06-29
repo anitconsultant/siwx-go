@@ -10,6 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 
+	"github.com/anitconsultant/siwx-go/siwx/evm"
 	"github.com/anitconsultant/siwx-go/siwx/evm/evmrpc"
 )
 
@@ -89,6 +90,29 @@ func TestResolverCodeAtAndCallContract(t *testing.T) {
 	}
 }
 
+func TestResolverCallContractCreation(t *testing.T) {
+	srv := rpcServer(t, "0x", "0x01")
+	defer srv.Close()
+
+	r := evmrpc.NewResolver(map[string]string{"eip155:1": srv.URL})
+	c, ok := r.ClientFor("eip155:1")
+	if !ok {
+		t.Fatal("client missing")
+	}
+	dc, ok := c.(evm.DeploylessCaller)
+	if !ok {
+		t.Fatal("evmrpc client must implement evm.DeploylessCaller")
+	}
+
+	ret, err := dc.CallContractCreation(context.Background(), []byte{0x60, 0x80})
+	if err != nil {
+		t.Fatalf("CallContractCreation: %v", err)
+	}
+	if !bytes.Equal(ret, common.FromHex("0x01")) {
+		t.Errorf("CallContractCreation bytes: got %x", ret)
+	}
+}
+
 func TestResolverDialError(t *testing.T) {
 	// A syntactically invalid endpoint makes the lazy dial fail; the error must
 	// surface from the chain-access methods rather than panic.
@@ -102,5 +126,8 @@ func TestResolverDialError(t *testing.T) {
 	}
 	if _, err := c.CallContract(context.Background(), common.Address{}, nil); err == nil {
 		t.Error("want dial error from CallContract on invalid endpoint")
+	}
+	if _, err := c.(evm.DeploylessCaller).CallContractCreation(context.Background(), nil); err == nil {
+		t.Error("want dial error from CallContractCreation on invalid endpoint")
 	}
 }

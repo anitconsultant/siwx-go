@@ -65,3 +65,21 @@ jobs:
               go test -run=^$ -fuzz="^${fn}$" -fuzztime=60s "./$pkg" || exit 1
             done
           done
+  anvil-integration:
+    # Proves the embedded ERC-6492 validator bytecode against a real EVM. Lives
+    # in its own job (build tag `anvil`) so the cross-platform matrix needs no
+    # Foundry; this one installs it and runs the deployless validation flow.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with: { go-version: '1.25.11' }
+      - uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d # v1.8.0
+      - name: ERC-6492 deployless validation against anvil
+        run: |
+          anvil --silent &
+          for i in $(seq 1 30); do
+            cast block-number --rpc-url http://localhost:8545 >/dev/null 2>&1 && break
+            sleep 1
+          done
+          SIWX_ANVIL_RPC=http://localhost:8545 go test -tags anvil ./siwx/evm/ -run Anvil -v

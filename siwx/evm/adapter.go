@@ -170,17 +170,27 @@ func (a adapter) Verify(ctx context.Context, msg []byte, sig []byte, opts siwx.V
 
 func (a adapter) verifySignature(ctx context.Context, parsed *siwelib.Message, sig []byte) error {
 	hash := accounts.TextHash([]byte(parsed.String()))
+
+	// Resolve the opt-in chain client for this message's chain, if any.
+	var client ChainClient
+	if a.resolver != nil {
+		client, _ = a.resolver.ClientFor(fmt.Sprintf("eip155:%d", parsed.GetChainID()))
+	}
+
+	// ERC-6492 (counterfactual / wrapped) signatures must be validated deployless
+	// on-chain; the universal validator handles every case, so route them whole.
+	// Without a deployless-capable client we cannot validate — return a clear
+	// error rather than a silent false negative.
 	if hasERC6492Suffix(sig) {
-		return fmt.Errorf("evm: ERC-6492 not yet supported (planned v0.5.0): %w", siwx.ErrContractWalletUnsupported)
+		dc, ok := client.(DeploylessCaller)
+		if !ok {
+			return fmt.Errorf("evm: ERC-6492 signature needs a deployless-capable chain client: %w", siwx.ErrContractWalletUnsupported)
+		}
+		return validateERC6492(ctx, dc, parsed.GetAddress(), hash, sig)
 	}
 
-	if a.resolver == nil {
-		return verifyEIP191(parsed, sig)
-	}
-
-	chainID := fmt.Sprintf("eip155:%d", parsed.GetChainID())
-	client, ok := a.resolver.ClientFor(chainID)
-	if !ok {
+	// No client configured (or none for this chain): EOA-only, network-free.
+	if client == nil {
 		return verifyEIP191(parsed, sig)
 	}
 

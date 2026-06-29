@@ -26,6 +26,7 @@ This follows the open standard [CAIP-122](https://github.com/ChainAgnostic/CAIPs
 - [Which package do I use?](#which-package-do-i-use)
 - [Example 1: Solana only (the `siws` package)](#example-1-solana-only-the-siws-package)
 - [Example 2: Solana and Ethereum (the `siwx` package)](#example-2-solana-and-ethereum-the-siwx-package)
+- [Smart-contract wallets (ERC-1271)](#smart-contract-wallets-erc-1271)
 - [Who is the signed-in user? (the identity model)](#who-is-the-signed-in-user-the-identity-model)
 - [Handling errors](#handling-errors)
 - [Build a real login server (the demo hub)](#build-a-real-login-server-the-demo-hub)
@@ -215,6 +216,32 @@ To add another chain later, you write one small adapter and call
 
 ---
 
+## Smart-contract wallets (ERC-1271)
+
+EVM verification is EOA-only and network-free by default. To verify deployed
+smart-contract wallets, opt in with a caller-supplied RPC resolver:
+
+```go
+package main
+
+import (
+	"os"
+
+	"github.com/anitconsultant/siwx-go/siwx/evm"
+	"github.com/anitconsultant/siwx-go/siwx/evm/evmrpc"
+)
+
+var verifier = evm.New(evm.WithChainClient(evmrpc.NewResolver(map[string]string{
+	"eip155:1": os.Getenv("RPC_ETH_MAINNET"),
+})))
+```
+
+Omitting `WithChainClient` keeps the EVM adapter in its original EOA-only mode
+and does not make network calls. ERC-6492 counterfactual wallet validation is
+planned for a later release.
+
+---
+
 ## Who is the signed-in user? (the identity model)
 
 > **Read this first.** Wallet sign-in is **pseudonymous**. It proves that someone
@@ -342,6 +369,9 @@ What each error means, in plain words:
 | `ErrNonceMismatch` | The one-time code is wrong, missing, or already used. |
 | `ErrBadSignature` | The signature does not match the message or the wallet. |
 | `ErrUnsupportedNamespace` | (`siwx` only) No chain adapter is registered for that chain id. |
+| `ErrContractValidationFailed` | (`siwx` EVM only) A smart-contract wallet rejected the signature. |
+| `ErrContractWalletUnsupported` | (`siwx` EVM only) Contract-wallet validation needs unsupported behavior, such as ERC-6492. |
+| `ErrRPC` | (`siwx` EVM only) A configured chain RPC call failed. |
 
 The same names exist in both packages (`siws.ErrExpired` and `siwx.ErrExpired`,
 and so on).

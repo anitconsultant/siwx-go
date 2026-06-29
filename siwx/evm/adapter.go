@@ -10,15 +10,52 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts"
+	"github.com/ethereum/go-ethereum/common"
 	siwelib "github.com/spruceid/siwe-go"
 
 	"github.com/anitconsultant/siwx-go/siwx"
 )
 
-type adapter struct{}
+var (
+	erc1271MagicValue = []byte{0x16, 0x26, 0xba, 0x7e}
+	erc1271Selector   = []byte{0x16, 0x26, 0xba, 0x7e}
+	erc6492Magic      = common.FromHex("0x6492649264926492649264926492649264926492649264926492649264926492")
+)
+
+// ChainClient is the minimal chain access needed for ERC-1271 validation.
+type ChainClient interface {
+	CallContract(ctx context.Context, to common.Address, data []byte) ([]byte, error)
+	CodeAt(ctx context.Context, addr common.Address) ([]byte, error)
+}
+
+// Resolver maps a CAIP-2 chain id string (e.g. "eip155:1") to a ChainClient.
+type Resolver interface {
+	ClientFor(chainID string) (ChainClient, bool)
+}
+
+// Option configures the EVM adapter.
+type Option func(*adapter)
+
+type adapter struct {
+	resolver Resolver
+}
+
+// WithChainClient enables opt-in chain access for ERC-1271 contract wallets.
+func WithChainClient(r Resolver) Option {
+	return func(a *adapter) {
+		a.resolver = r
+	}
+}
 
 // New returns a siwx.Verifier for the "eip155" namespace.
-func New() siwx.Verifier { return adapter{} }
+func New(opts ...Option) siwx.Verifier {
+	a := &adapter{}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
+}
 
 // Namespace returns "eip155".
 func (adapter) Namespace() string { return "eip155" }
@@ -101,10 +138,8 @@ func (a adapter) Verify(ctx context.Context, msg []byte, sig []byte, opts siwx.V
 		}
 	}
 
-	// Signature: siwe-go VerifyEIP191 expects a 0x-prefixed hex string.
-	sigHex := "0x" + hex.EncodeToString(sig)
 	start := time.Now()
-	_, sigErr := parsed.VerifyEIP191(sigHex)
+	sigErr := a.verifySignature(ctx, parsed, sig)
 	obs.OnCheckResult(siwx.CheckResult{
 		AttemptID: attemptID,
 		Check:     siwx.CheckSignature,
@@ -112,7 +147,7 @@ func (a adapter) Verify(ctx context.Context, msg []byte, sig []byte, opts siwx.V
 		Duration:  time.Since(start),
 	})
 	if sigErr != nil {
-		return nil, fmt.Errorf("%w", siwx.ErrBadSignature)
+		return nil, sigErr
 	}
 
 	issuedAt, _ := parseISO8601(parsed.GetIssuedAt())
@@ -131,6 +166,84 @@ func (a adapter) Verify(ctx context.Context, msg []byte, sig []byte, opts siwx.V
 		}
 	}
 	return id, nil
+}
+
+func (a adapter) verifySignature(ctx context.Context, parsed *siwelib.Message, sig []byte) error {
+	hash := accounts.TextHash([]byte(parsed.String()))
+	if hasERC6492Suffix(sig) {
+		return fmt.Errorf("evm: ERC-6492 not yet supported (planned v0.5.0): %w", siwx.ErrContractWalletUnsupported)
+	}
+
+	if a.resolver == nil {
+		return verifyEIP191(parsed, sig)
+	}
+
+	chainID := fmt.Sprintf("eip155:%d", parsed.GetChainID())
+	client, ok := a.resolver.ClientFor(chainID)
+	if !ok {
+		return verifyEIP191(parsed, sig)
+	}
+
+	addr := parsed.GetAddress()
+	code, err := client.CodeAt(ctx, addr)
+	if err != nil {
+		return fmt.Errorf("evm: code lookup failed: %w: %w", siwx.ErrRPC, err)
+	}
+	if len(code) == 0 {
+		return verifyEIP191(parsed, sig)
+	}
+
+	ret, err := client.CallContract(ctx, addr, erc1271Calldata(hash, sig))
+	if err != nil {
+		return fmt.Errorf("evm: contract signature validation rpc failed: %w: %w", siwx.ErrRPC, err)
+	}
+	if len(ret) >= len(erc1271MagicValue) && subtle.ConstantTimeCompare(ret[:4], erc1271MagicValue) == 1 {
+		return nil
+	}
+	return fmt.Errorf("evm: ERC-1271 isValidSignature returned invalid magic value: %w", siwx.ErrContractValidationFailed)
+}
+
+func verifyEIP191(parsed *siwelib.Message, sig []byte) error {
+	// siwe-go VerifyEIP191 expects a 0x-prefixed hex string.
+	sigHex := "0x" + hex.EncodeToString(sig)
+	if _, err := parsed.VerifyEIP191(sigHex); err != nil {
+		return fmt.Errorf("%w", siwx.ErrBadSignature)
+	}
+	return nil
+}
+
+func hasERC6492Suffix(sig []byte) bool {
+	return len(sig) >= len(erc6492Magic) &&
+		subtle.ConstantTimeCompare(sig[len(sig)-len(erc6492Magic):], erc6492Magic) == 1
+}
+
+func erc1271Calldata(hash []byte, sig []byte) []byte {
+	paddedSigLen := ((len(sig) + 31) / 32) * 32
+	data := make([]byte, 0, len(erc1271Selector)+32+32+32+paddedSigLen)
+	data = append(data, erc1271Selector...)
+	data = append(data, rightSizedWord(hash)...)
+	data = append(data, uint256Word(64)...)
+	data = append(data, uint256Word(len(sig))...)
+	data = append(data, sig...)
+	if pad := paddedSigLen - len(sig); pad > 0 {
+		data = append(data, make([]byte, pad)...)
+	}
+	return data
+}
+
+func rightSizedWord(b []byte) []byte {
+	word := make([]byte, 32)
+	copy(word, b)
+	return word
+}
+
+func uint256Word(n int) []byte {
+	word := make([]byte, 32)
+	word[31] = byte(n)
+	word[30] = byte(n >> 8)
+	word[29] = byte(n >> 16)
+	word[28] = byte(n >> 24)
+	return word
 }
 
 func mapParseErr(err error) error {

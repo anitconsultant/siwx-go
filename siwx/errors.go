@@ -7,11 +7,14 @@ import "errors"
 // Sentinel errors — frozen per contracts/contracts.go.
 // Adapters translate namespace-specific errors to these so callers use errors.Is.
 var (
-	ErrMalformed            = errors.New("siwx: malformed message")
-	ErrBadSignature         = errors.New("siwx: signature verification failed")
-	ErrExpired              = errors.New("siwx: message expired")
-	ErrNotYetValid          = errors.New("siwx: message not yet valid")
-	ErrDomainMismatch       = errors.New("siwx: domain mismatch")
-	ErrNonceMismatch        = errors.New("siwx: nonce mismatch")
-	ErrUnsupportedNamespace = errors.New("siwx: unsupported namespace")
+	ErrMalformed                 = errors.New("siwx: malformed message")
+	ErrBadSignature              = errors.New("siwx: signature verification failed")
+	ErrExpired                   = errors.New("siwx: message expired")
+	ErrNotYetValid               = errors.New("siwx: message not yet valid")
+	ErrDomainMismatch            = errors.New("siwx: domain mismatch")
+	ErrNonceMismatch             = errors.New("siwx: nonce mismatch")
+	ErrUnsupportedNamespace      = errors.New("siwx: unsupported namespace")
+	ErrContractValidationFailed  = errors.New("siwx: contract signature validation failed")
+	ErrContractWalletUnsupported = errors.New("siwx: contract wallet signature unsupported (no chain client configured)")
+	ErrRPC                       = errors.New("siwx: rpc call failed")
 )

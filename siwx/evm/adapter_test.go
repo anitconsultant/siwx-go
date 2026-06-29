@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	siwelib "github.com/spruceid/siwe-go"
 
@@ -181,4 +182,193 @@ func TestEVMAdapterMalformedMessage(t *testing.T) {
 	if !errors.Is(err, siwx.ErrMalformed) {
 		t.Errorf("want ErrMalformed, got %v", err)
 	}
+}
+
+type mockResolver map[string]*mockChainClient
+
+func (r mockResolver) ClientFor(chainID string) (evmadapter.ChainClient, bool) {
+	c, ok := r[chainID]
+	return c, ok
+}
+
+type mockChainClient struct {
+	code    []byte
+	codeErr error
+	ret     []byte
+	callErr error
+
+	codeCalls int
+	callCalls int
+	lastTo    common.Address
+	lastData  []byte
+}
+
+func (c *mockChainClient) CodeAt(context.Context, common.Address) ([]byte, error) {
+	c.codeCalls++
+	return c.code, c.codeErr
+}
+
+func (c *mockChainClient) CallContract(_ context.Context, to common.Address, data []byte) ([]byte, error) {
+	c.callCalls++
+	c.lastTo = to
+	c.lastData = append([]byte(nil), data...)
+	return c.ret, c.callErr
+}
+
+func TestEVMAdapterERC1271Valid(t *testing.T) {
+	key, _ := ethcrypto.GenerateKey()
+	nonce := siwelib.GenerateNonce()
+	msg, sig := signSIWE(t, key, "dapp.academy", nonce, map[string]interface{}{"chainId": 1})
+
+	ret := make([]byte, 32)
+	copy(ret, []byte{0x16, 0x26, 0xba, 0x7e})
+	client := &mockChainClient{code: []byte{0x60, 0x00}, ret: ret}
+	v := evmadapter.New(evmadapter.WithChainClient(mockResolver{"eip155:1": client}))
+
+	id, err := v.Verify(context.Background(), msg, sig, siwx.VerifyOpts{
+		ExpectedDomain: "dapp.academy",
+		ExpectedNonce:  nonce,
+		Observer:       siwx.NopObserver{},
+		Clock:          refClock,
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if id == nil || id.Account.ChainID.String() != "eip155:1" {
+		t.Fatalf("identity: got %#v", id)
+	}
+	if client.codeCalls != 1 {
+		t.Fatalf("CodeAt calls: got %d, want 1", client.codeCalls)
+	}
+	if client.callCalls != 1 {
+		t.Fatalf("CallContract calls: got %d, want 1", client.callCalls)
+	}
+	if len(client.lastData) < 4 || string(client.lastData[:4]) != string([]byte{0x16, 0x26, 0xba, 0x7e}) {
+		t.Fatalf("selector: got %x", client.lastData[:min(len(client.lastData), 4)])
+	}
+}
+
+func TestEVMAdapterERC1271Invalid(t *testing.T) {
+	key, _ := ethcrypto.GenerateKey()
+	nonce := siwelib.GenerateNonce()
+	msg, sig := signSIWE(t, key, "dapp.academy", nonce, map[string]interface{}{"chainId": 1})
+
+	client := &mockChainClient{code: []byte{0x60, 0x00}, ret: make([]byte, 32)}
+	v := evmadapter.New(evmadapter.WithChainClient(mockResolver{"eip155:1": client}))
+
+	_, err := v.Verify(context.Background(), msg, sig, siwx.VerifyOpts{
+		ExpectedDomain: "dapp.academy",
+		ExpectedNonce:  nonce,
+		Observer:       siwx.NopObserver{},
+		Clock:          refClock,
+	})
+	if !errors.Is(err, siwx.ErrContractValidationFailed) {
+		t.Fatalf("want ErrContractValidationFailed, got %v", err)
+	}
+}
+
+func TestEVMAdapterERC1271RPCErrors(t *testing.T) {
+	key, _ := ethcrypto.GenerateKey()
+	nonce := siwelib.GenerateNonce()
+	msg, sig := signSIWE(t, key, "dapp.academy", nonce, map[string]interface{}{"chainId": 1})
+	rpcErr := errors.New("rpc down")
+
+	t.Run("CodeAt", func(t *testing.T) {
+		client := &mockChainClient{codeErr: rpcErr}
+		v := evmadapter.New(evmadapter.WithChainClient(mockResolver{"eip155:1": client}))
+
+		_, err := v.Verify(context.Background(), msg, sig, siwx.VerifyOpts{
+			ExpectedDomain: "dapp.academy",
+			ExpectedNonce:  nonce,
+			Observer:       siwx.NopObserver{},
+			Clock:          refClock,
+		})
+		if !errors.Is(err, siwx.ErrRPC) {
+			t.Fatalf("want ErrRPC, got %v", err)
+		}
+	})
+
+	t.Run("CallContract", func(t *testing.T) {
+		client := &mockChainClient{code: []byte{0x60, 0x00}, callErr: rpcErr}
+		v := evmadapter.New(evmadapter.WithChainClient(mockResolver{"eip155:1": client}))
+
+		_, err := v.Verify(context.Background(), msg, sig, siwx.VerifyOpts{
+			ExpectedDomain: "dapp.academy",
+			ExpectedNonce:  nonce,
+			Observer:       siwx.NopObserver{},
+			Clock:          refClock,
+		})
+		if !errors.Is(err, siwx.ErrRPC) {
+			t.Fatalf("want ErrRPC, got %v", err)
+		}
+	})
+}
+
+func TestEVMAdapterERC6492UnsupportedWithoutClient(t *testing.T) {
+	key, _ := ethcrypto.GenerateKey()
+	nonce := siwelib.GenerateNonce()
+	msg, sig := signSIWE(t, key, "dapp.academy", nonce, map[string]interface{}{"chainId": 1})
+
+	_, err := evmadapter.New().Verify(context.Background(), msg, withERC6492Suffix(sig), siwx.VerifyOpts{
+		ExpectedDomain: "dapp.academy",
+		ExpectedNonce:  nonce,
+		Observer:       siwx.NopObserver{},
+		Clock:          refClock,
+	})
+	if !errors.Is(err, siwx.ErrContractWalletUnsupported) {
+		t.Fatalf("want ErrContractWalletUnsupported, got %v", err)
+	}
+}
+
+func TestEVMAdapterERC6492UnsupportedWithClient(t *testing.T) {
+	key, _ := ethcrypto.GenerateKey()
+	nonce := siwelib.GenerateNonce()
+	msg, sig := signSIWE(t, key, "dapp.academy", nonce, map[string]interface{}{"chainId": 1})
+	client := &mockChainClient{code: []byte{0x60, 0x00}}
+	v := evmadapter.New(evmadapter.WithChainClient(mockResolver{"eip155:1": client}))
+
+	_, err := v.Verify(context.Background(), msg, withERC6492Suffix(sig), siwx.VerifyOpts{
+		ExpectedDomain: "dapp.academy",
+		ExpectedNonce:  nonce,
+		Observer:       siwx.NopObserver{},
+		Clock:          refClock,
+	})
+	if !errors.Is(err, siwx.ErrContractWalletUnsupported) {
+		t.Fatalf("want ErrContractWalletUnsupported, got %v", err)
+	}
+	if client.codeCalls != 0 || client.callCalls != 0 {
+		t.Fatalf("6492 path made chain calls: CodeAt=%d CallContract=%d", client.codeCalls, client.callCalls)
+	}
+}
+
+func TestEVMAdapterEOAWithClientConfigured(t *testing.T) {
+	key, _ := ethcrypto.GenerateKey()
+	nonce := siwelib.GenerateNonce()
+	msg, sig := signSIWE(t, key, "dapp.academy", nonce, map[string]interface{}{"chainId": 1})
+	client := &mockChainClient{}
+	v := evmadapter.New(evmadapter.WithChainClient(mockResolver{"eip155:1": client}))
+
+	id, err := v.Verify(context.Background(), msg, sig, siwx.VerifyOpts{
+		ExpectedDomain: "dapp.academy",
+		ExpectedNonce:  nonce,
+		Observer:       siwx.NopObserver{},
+		Clock:          refClock,
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if id == nil {
+		t.Fatal("identity is nil")
+	}
+	if client.codeCalls != 1 {
+		t.Fatalf("CodeAt calls: got %d, want 1", client.codeCalls)
+	}
+	if client.callCalls != 0 {
+		t.Fatalf("CallContract calls: got %d, want 0", client.callCalls)
+	}
+}
+
+func withERC6492Suffix(sig []byte) []byte {
+	out := append([]byte(nil), sig...)
+	return append(out, common.FromHex("0x6492649264926492649264926492649264926492649264926492649264926492")...)
 }

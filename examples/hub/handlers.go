@@ -5,9 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/anitconsultant/siwx-go/siwx"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,6 +40,10 @@ type Hub struct {
 	statement     string // sign-in prompt statement
 	solanaChain   string // Solana cluster, e.g. "mainnet"
 	sessionTTLMin int    // sign-in message expiration window, in minutes
+
+	// ERC-1271 contract-wallet demo (simulated chain). nil when disabled.
+	contractWalletDemo bool
+	demoWallets        *demoContractWallets
 }
 
 func requestID(c *gin.Context) string {
@@ -67,9 +73,42 @@ func (h *Hub) getNonce(c *gin.Context) {
 // hub's environment-driven Config, never hard-coded in the browser.
 func (h *Hub) getConfig(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
-		"statement":         h.statement,
-		"solanaChain":       h.solanaChain,
-		"sessionTtlMinutes": h.sessionTTLMin,
+		"statement":          h.statement,
+		"solanaChain":        h.solanaChain,
+		"sessionTtlMinutes":  h.sessionTTLMin,
+		"contractWalletDemo": h.contractWalletDemo,
+	})
+}
+
+// registerWalletRequest is the POST /demo/contract-wallet body.
+type registerWalletRequest struct {
+	Owner string `json:"owner"` // owner EOA address, e.g. "0xabc..."
+}
+
+// postRegisterContractWallet handles POST /demo/contract-wallet — a demo-only
+// helper that derives the simulated ERC-1271 contract-wallet address owned by
+// the given EOA and records the ownership so /auth/verify can validate against
+// it. Returns the contract-wallet address the frontend should name in the SIWE
+// message (the message is then signed by the owner EOA).
+func (h *Hub) postRegisterContractWallet(c *gin.Context) {
+	if h.demoWallets == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "contract wallet demo disabled"})
+		return
+	}
+	var req registerWalletRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeProblem(c, siwx.ErrMalformed, requestID(c))
+		return
+	}
+	owner := strings.TrimSpace(req.Owner)
+	if !common.IsHexAddress(owner) {
+		writeProblem(c, siwx.ErrMalformed, requestID(c))
+		return
+	}
+	wallet := h.demoWallets.Register(common.HexToAddress(owner))
+	c.JSON(http.StatusOK, gin.H{
+		"address": wallet.Hex(), // EIP-55 checksummed
+		"owner":   common.HexToAddress(owner).Hex(),
 	})
 }
 

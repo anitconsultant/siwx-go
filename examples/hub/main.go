@@ -28,20 +28,33 @@ func main() {
 
 	registry := siwx.NewRegistry()
 	registry.Register(solanadapter.New())
-	registry.Register(evmadapter.New())
+
+	// EVM adapter: opt into the ERC-1271 contract-wallet path with an injected
+	// chain client. The demo uses an in-process simulated chain; production code
+	// would inject evmrpc.NewResolver(...) with real RPC URLs instead. Either way
+	// ordinary EOA sign-in still works (codeless addresses fall back to ecrecover).
+	var demoWallets *demoContractWallets
+	if cfg.ContractWalletDemo {
+		demoWallets = newDemoContractWallets()
+		registry.Register(evmadapter.New(evmadapter.WithChainClient(demoWallets)))
+	} else {
+		registry.Register(evmadapter.New())
+	}
 
 	recorder := newRecorder(log)
 
 	hub := &Hub{
-		domain:        cfg.Domain,
-		registry:      registry,
-		nonces:        newNonceStore(time.Now),
-		ids:           newIdentityStore(),
-		issuer:        issuer,
-		recorder:      recorder,
-		statement:     cfg.Statement,
-		solanaChain:   cfg.SolanaChain,
-		sessionTTLMin: cfg.SessionTTLMin,
+		domain:             cfg.Domain,
+		registry:           registry,
+		nonces:             newNonceStore(time.Now),
+		ids:                newIdentityStore(),
+		issuer:             issuer,
+		recorder:           recorder,
+		statement:          cfg.Statement,
+		solanaChain:        cfg.SolanaChain,
+		sessionTTLMin:      cfg.SessionTTLMin,
+		contractWalletDemo: cfg.ContractWalletDemo,
+		demoWallets:        demoWallets,
 	}
 
 	r := gin.New()
@@ -55,6 +68,11 @@ func main() {
 
 	// Demo display config for the frontend.
 	r.GET("/config", hub.getConfig)
+
+	// Demo-only: register an owner EOA's simulated ERC-1271 contract wallet.
+	if cfg.ContractWalletDemo {
+		r.POST("/demo/contract-wallet", hub.postRegisterContractWallet)
+	}
 
 	// Well-known + observability.
 	r.GET("/.well-known/jwks.json", hub.getJWKS)

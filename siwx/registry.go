@@ -104,6 +104,7 @@ func sentinelFor(err error) error {
 	for _, s := range []error{
 		ErrMalformed, ErrBadSignature, ErrExpired, ErrNotYetValid,
 		ErrDomainMismatch, ErrNonceMismatch, ErrUnsupportedNamespace,
+		ErrContractValidationFailed, ErrContractWalletUnsupported, ErrRPC,
 	} {
 		if errors.Is(err, s) {
 			return s

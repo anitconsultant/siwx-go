@@ -336,6 +336,103 @@ async function evmSignIn() {
   }
 }
 
+// ---- EVM / Smart-contract wallet (ERC-1271) ----
+
+// Registers the demo contract wallet owned by `owner` and returns its address.
+async function registerContractWallet(owner) {
+  const r = await fetch(`${HUB}/demo/contract-wallet`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner }),
+  });
+  if (!r.ok) throw new Error('Contract-wallet registration failed: ' + r.status);
+  return (await r.json()).address; // EIP-55 checksummed contract address
+}
+
+// contractWalletSignIn signs in as a smart-contract wallet: the SIWE message
+// names the *contract* address, but MetaMask (the owner EOA) produces the
+// signature. The server takes the ERC-1271 path — CodeAt sees code at the
+// contract, then isValidSignature confirms the owner signed.
+async function contractWalletSignIn() {
+  const prog = document.getElementById('progress');
+  let steps = initSteps();
+  steps[1].label = 'Owner EOA signs for contract wallet';
+  prog.steps = steps;
+
+  try {
+    steps = setStep(steps, 'nonce', 'active');
+    prog.steps = steps;
+    const [{ nonce, domain }, config] = await Promise.all([fetchNonce(), fetchConfig()]);
+    steps = setStep(steps, 'nonce', 'done');
+
+    steps = setStep(steps, 'wallet', 'active');
+    prog.steps = steps;
+
+    const provider = getMetaMaskProvider();
+    if (!provider) throw new Error('MetaMask not found. Is it installed and enabled?');
+    const [rawOwner] = await provider.request({ method: 'eth_requestAccounts' });
+    const owner = toChecksumAddress(rawOwner);
+
+    // The demo wallet address is derived from (and owned by) this EOA.
+    const walletAddress = await registerContractWallet(owner);
+
+    const chainIdHex = await provider.request({ method: 'eth_chainId' });
+    const chainIdDec = parseInt(chainIdHex, 16);
+    const issuedAt = new Date().toISOString();
+    const expirationTime = new Date(Date.now() + config.sessionTtlMinutes * 60 * 1000).toISOString();
+    const uri = window.location.origin + '/';
+
+    // SIWE message names the CONTRACT address...
+    const siweMsg = [
+      `${domain} wants you to sign in with your Ethereum account:`,
+      walletAddress,
+      '',
+      config.statement,
+      '',
+      `URI: ${uri}`,
+      'Version: 1',
+      `Chain ID: ${chainIdDec}`,
+      `Nonce: ${nonce}`,
+      `Issued At: ${issuedAt}`,
+      `Expiration Time: ${expirationTime}`,
+    ].join('\n');
+
+    const msgBytes = new TextEncoder().encode(siweMsg);
+    const hexMsg = '0x' + Array.from(msgBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+    // ...but the OWNER EOA produces the signature.
+    const hexSig = await provider.request({ method: 'personal_sign', params: [hexMsg, owner] });
+    const sigBytes = new Uint8Array(hexSig.slice(2).match(/.{2}/g).map(b => parseInt(b, 16)));
+    steps = setStep(steps, 'wallet', 'done');
+
+    steps = setStep(steps, 'verify', 'active');
+    prog.steps = steps;
+    const resp = await postVerify(msgBytes, sigBytes, `eip155:${chainIdDec}`);
+
+    const checks = resp.checks || [];
+    steps = setStep(steps, 'verify', 'done', checks);
+    prog.steps = steps;
+
+    await animateChecks(prog, steps, checks);
+
+    steps = setStep(steps, 'token', 'active');
+    prog.steps = steps;
+    await delay(150);
+    steps = setStep(steps, 'token', 'done');
+    steps = setStep(steps, 'linked', 'done');
+    prog.steps = steps;
+
+    showResult(
+      `Signed in as smart-contract wallet (ERC-1271):\n${walletAddress}\n` +
+      `owner EOA: ${owner}\n\nToken (first 40 chars): ${resp.token.substring(0, 40)}...`
+    );
+  } catch (err) {
+    const failId = steps.find(s => s.state === 'active')?.id;
+    if (failId) steps = setStep(steps, failId, 'failed');
+    prog.steps = steps;
+    showResult(err.problem?.detail || err.message, true);
+  }
+}
+
 async function animateChecks(prog, steps, checks) {
   for (let i = 0; i < checks.length; i++) {
     await delay(150);
@@ -351,3 +448,14 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 // ---- Event bindings ----
 document.getElementById('btn-solana').addEventListener('click', solanaSignIn);
 document.getElementById('btn-evm').addEventListener('click', evmSignIn);
+document.getElementById('btn-erc1271').addEventListener('click', contractWalletSignIn);
+
+// Reveal the ERC-1271 button only when the server has the demo enabled.
+fetchConfig()
+  .then((config) => {
+    if (config.contractWalletDemo) {
+      document.getElementById('btn-erc1271').style.display = 'flex';
+      document.getElementById('erc1271-note').style.display = 'block';
+    }
+  })
+  .catch(() => {});

@@ -59,6 +59,16 @@ func (c *client) CodeAt(ctx context.Context, addr common.Address) ([]byte, error
 	return eth.CodeAt(ctx, addr, nil)
 }
 
+// CallContractCreation runs eth_call against a contract creation (to == nil),
+// satisfying evm.DeploylessCaller for ERC-6492 counterfactual validation.
+func (c *client) CallContractCreation(ctx context.Context, data []byte) ([]byte, error) {
+	eth, err := c.ethClient(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return eth.CallContract(ctx, ethereum.CallMsg{Data: data}, nil)
+}
+
 func (c *client) ethClient(ctx context.Context) (*ethclient.Client, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

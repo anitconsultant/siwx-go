@@ -7,7 +7,7 @@ toolchain go1.24.4
 require (
 	github.com/ethereum/go-ethereum v1.17.0
 	github.com/gin-gonic/gin v1.9.1
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/spruceid/siwe-go v0.2.1
 )
 

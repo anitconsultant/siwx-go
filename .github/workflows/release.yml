@@ -4,18 +4,32 @@ on:
     tags: ['v*']
 permissions: read-all
 jobs:
-  goreleaser:
+  release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # create the GitHub release / upload assets
+      contents: write # create the GitHub release
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with: { fetch-depth: 0 }
-      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
-        with: { go-version: '1.25' }
-      - uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
-        with:
-          version: latest
-          args: release --clean
+      - name: Create GitHub release from CHANGELOG
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          ver="${tag#v}"
+          # Extract this version's section from CHANGELOG.md (between its heading
+          # and the next "## [" heading).
+          awk -v v="$ver" '
+            $0 ~ "^## \\[" v "\\]" {grab=1; next}
+            grab && /^## \[/ {exit}
+            grab {print}
+          ' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "$tag" --notes-file notes.md --verify-tag
+          else
+            # No changelog entry — let GitHub autogenerate notes from commits.
+            gh release create "$tag" --repo "$GITHUB_REPOSITORY" \
+              --title "$tag" --generate-notes --verify-tag
+          fi

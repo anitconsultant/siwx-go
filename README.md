@@ -91,10 +91,18 @@ A few words you'll see a lot:
 ## Install
 
 ```bash
-go get github.com/anitconsultant/siwx-go
+go get github.com/anitconsultant/siwx-go@latest
 ```
 
-Requires **Go 1.24+**.
+Or pin a specific release (recommended for reproducible builds):
+
+```bash
+go get github.com/anitconsultant/siwx-go@v0.5.0
+```
+
+Requires **Go 1.24+**. Releases follow [Semantic Versioning](https://semver.org);
+see [`CHANGELOG.md`](CHANGELOG.md) for what changed in each version. Smart-contract
+wallet support landed in **v0.4.0** (ERC-1271) and **v0.5.0** (ERC-6492).
 
 ---
 

@@ -66,6 +66,15 @@
       Sign in with MetaMask (Ethereum)
     </button>
 
+    <button class="btn" id="btn-erc1271" style="display:none">
+      <img src="https://cryptologos.cc/logos/ethereum-eth-logo.png" alt="" onerror="this.style.display='none'" />
+      Sign in with a smart-contract wallet (ERC-1271)
+    </button>
+    <p class="subtitle" id="erc1271-note" style="display:none; margin: -.25rem 0 .75rem; font-size:.75rem;">
+      Simulated chain: MetaMask is the owner EOA of a demo contract wallet; the
+      server validates via on-chain <code>isValidSignature</code>.
+    </p>
+
     <siwx-progress id="progress"></siwx-progress>
 
     <div id="result"></div>

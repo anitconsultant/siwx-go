@@ -20,6 +20,11 @@ type Config struct {
 	Statement     string // SIWX_STATEMENT (shown in the wallet sign-in prompt)
 	SolanaChain   string // SIWX_SOLANA_CHAIN (e.g. "mainnet", "devnet")
 	SessionTTLMin int    // SIWX_SESSION_TTL_MIN (sign-in message expiration window)
+
+	// ContractWalletDemo enables the in-process simulated chain that exercises
+	// the library's ERC-1271 contract-wallet path (SIWX_EVM_CONTRACT_DEMO).
+	// On by default so the feature is visible without extra setup.
+	ContractWalletDemo bool
 }
 
 // loadConfig reads a .env file (if present) then resolves every setting from
@@ -29,14 +34,32 @@ func loadConfig() Config {
 	loadDotEnv(".env")
 	port := env("SIWX_PORT", "8081")
 	return Config{
-		Domain:        buildDomain(env("SIWX_DOMAIN", "localhost"), port),
-		Addr:          env("SIWX_ADDR", ":"+port),
-		JWKSURL:       env("SIWX_JWKS_URL", "http://localhost:"+port+"/.well-known/jwks.json"),
-		IssuerURL:     env("SIWX_ISSUER_URL", "https://accounts.example.local"),
-		Audience:      env("SIWX_AUDIENCE", "siwx-go-demo"),
-		Statement:     env("SIWX_STATEMENT", "Sign in to siwx-go demo"),
-		SolanaChain:   env("SIWX_SOLANA_CHAIN", "mainnet"),
-		SessionTTLMin: envInt("SIWX_SESSION_TTL_MIN", 10),
+		Domain:             buildDomain(env("SIWX_DOMAIN", "localhost"), port),
+		Addr:               env("SIWX_ADDR", ":"+port),
+		JWKSURL:            env("SIWX_JWKS_URL", "http://localhost:"+port+"/.well-known/jwks.json"),
+		IssuerURL:          env("SIWX_ISSUER_URL", "https://accounts.example.local"),
+		Audience:           env("SIWX_AUDIENCE", "siwx-go-demo"),
+		Statement:          env("SIWX_STATEMENT", "Sign in to siwx-go demo"),
+		SolanaChain:        env("SIWX_SOLANA_CHAIN", "mainnet"),
+		SessionTTLMin:      envInt("SIWX_SESSION_TTL_MIN", 10),
+		ContractWalletDemo: envBool("SIWX_EVM_CONTRACT_DEMO", true),
+	}
+}
+
+// envBool reads a boolean environment variable, returning fallback when unset
+// or unparseable. "1", "true", "yes", "on" (any case) are true.
+func envBool(key string, fallback bool) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if v == "" {
+		return fallback
+	}
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		return fallback
 	}
 }
 
